@@ -243,16 +243,25 @@ async function kvGet(key, url, token) {
     if (!data.result) return null;
 
     let parsed = data.result;
-    if (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch {}
+
+    while (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch { break; }
     }
-    if (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch {}
-    }
+
     if (Array.isArray(parsed)) parsed = parsed[0];
-    if (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch {}
+
+    while (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch { break; }
     }
+
+    // ← KEY FIX: unwrap { value: "..." } wrapper
+    if (parsed && typeof parsed === 'object' && 'value' in parsed && Object.keys(parsed).length === 1) {
+      parsed = parsed.value;
+      while (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch { break; }
+      }
+    }
+
     return parsed;
   } catch (err) {
     console.error(`kvGet error for key "${key}":`, err.message);
