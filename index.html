@@ -244,14 +244,16 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <button class="nav-item" onclick="nav('telegram')"><span class="icon">✈️</span>Telegram Notify</button>
   </div>
 
-  <div class="sidebar-footer">
-    <div class="clock-box">
-      <div style="font-size:9px;letter-spacing:1px;margin-bottom:2px">LOCAL TIME</div>
-      <div class="clock-val" id="clock">--:--:--</div>
-    </div>
-    <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:6px" id="date-lbl"></div>
-    <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">Q2 Deadline: Jun 30</div>
+<div class="sidebar-footer">
+  <div class="clock-box">
+    <div style="font-size:9px;letter-spacing:1px;margin-bottom:2px">LOCAL TIME</div>
+    <div class="clock-val" id="clock">--:--:--</div>
   </div>
+  <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:6px" id="date-lbl"></div>
+  <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">Q2 Deadline: Jun 30</div>
+  <button onclick="manualRefresh()" style="margin-top:10px;width:100%;background:transparent;border:1px solid var(--bdr);border-radius:6px;padding:6px;font-family:var(--mono);font-size:9px;color:var(--dim);cursor:pointer;letter-spacing:1px;transition:all .15s" onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'">🔄 SYNC DASHBOARD</button>
+  <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:4px;text-align:center" id="sync-status"></div>
+</div>
 </aside>
 
 <!-- ═══ MAIN ═══ -->
@@ -261,7 +263,10 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <div class="page active" id="page-overview">
   <div class="pg-header">
     <div><div class="pg-title">Good morning, Dom. 👋</div><div class="pg-sub">DEVCON × SUI MOU · OPERATIONAL OVERVIEW · 2026</div></div>
-    <button class="btn btn-acc" onclick="refreshAI()">⚡ AI BRIEFING</button>
+    <div style="display:flex;gap:8px">
+  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+  <button class="btn btn-acc" onclick="refreshAI()">⚡ AI BRIEFING</button>
+</div>
   </div>
 
   <div class="stat-row">
@@ -322,9 +327,10 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <div class="page" id="page-chapters">
   <div class="pg-header">
     <div><div class="pg-title">Chapter Code Camp Tracker</div><div class="pg-sub">5 EVENTS · NATIONWIDE · BY JUN 24, 2026</div></div>
-    <div style="display:flex;gap:6px;align-items:center">
-      <span style="font-family:var(--mono);font-size:10px;color:var(--sub)" id="camps-done-label">0 of 5 complete</span>
-    </div>
+<div style="display:flex;gap:6px;align-items:center">
+  <span style="font-family:var(--mono);font-size:10px;color:var(--sub)" id="camps-done-label">0 of 5 complete</span>
+  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+</div>
   </div>
 
   <div class="stat-row" style="grid-template-columns:repeat(5,1fr)">
@@ -342,7 +348,10 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <div class="page" id="page-budget">
   <div class="pg-header">
     <div><div class="pg-title">Budget Tracker</div><div class="pg-sub">ANNEX A · SUI FOUNDATION GRANT · ₱1,000,000 SUBTOTAL + 12% VAT ₱120,000 = ₱1,120,000</div></div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--sub)">Grand Total: ₱1,120,000 · 20% Admin Fee (Line 10)</div>
+    <div style="display:flex;gap:8px;align-items:center">
+  <div style="font-family:var(--mono);font-size:11px;color:var(--sub)">Grand Total: ₱1,120,000 · 20% Admin Fee (Line 10)</div>
+  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+</div>
   </div>
 
   <div class="stat-row">
@@ -370,9 +379,10 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <div class="page" id="page-risks">
   <div class="pg-header">
     <div><div class="pg-title">Risks to Manage</div><div class="pg-sub">OPEN ISSUES · FLAGGED FOR DOM & JEDD</div></div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-ghost btn-sm" onclick="addRiskPrompt()">+ ADD RISK</button>
-    </div>
+<div style="display:flex;gap:8px">
+  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+  <button class="btn btn-ghost btn-sm" onclick="addRiskPrompt()">+ ADD RISK</button>
+</div>
   </div>
 
   <div class="stat-row">
