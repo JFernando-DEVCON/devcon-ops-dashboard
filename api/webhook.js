@@ -254,13 +254,24 @@ else if (command === '/addtask') {
         tasks[priority] = [];
         reply = `⚠️ Priority array was missing, initialized. Try again.`;
       } else {
-        const newTask = {
-          id: 't' + Date.now(),
-          text: taskText,
-          assign,
-          due: '',
-          done: false
-        };
+const allTasks = [
+  ...tasks.critical,
+  ...tasks.high,
+  ...tasks.medium
+];
+const existingNums = allTasks
+  .map(t => parseInt(t.id.replace('t', '')))
+  .filter(n => !isNaN(n) && n < 1000000); // ignore timestamp IDs
+const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
+const newId = 't' + nextNum;
+
+const newTask = {
+  id: newId,
+  text: taskText,
+  assign,
+  due: '',
+  done: false
+};
         tasks[priority].push(newTask);
         await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
         const prioIcon = priority === 'critical' ? '🔴' : priority === 'high' ? '🟠' : '🟡';
