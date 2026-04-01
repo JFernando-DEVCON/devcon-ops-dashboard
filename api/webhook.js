@@ -116,6 +116,11 @@ if (command === '/help') {
   reply += `  example: <code>/addtask high Follow up Rolf @Rolf</code>\n`;
   reply += `/deltask [id] — delete a task\n\n`;
 
+  reply += `<b>💰 Budget Commands:</b>\n`;
+  reply += `/budget — view all budget line items\n`;
+  reply += `/updatespent [id] [amount] — update spent amount\n`;
+  reply += `  example: <code>/updatespent b1 55000</code>\n\n`;
+
   reply += `<b>⚠️ Risk Commands:</b>\n`;
   reply += `/risks — list all open risks with IDs\n`;
   reply += `/resolve [id] — mark risk as resolved\n\n`;
@@ -352,6 +357,46 @@ const newTask = {
       }
     }
 
+  else if (command === '/updatespent') {
+  // Usage: /updatespent b1 55000
+  const lineId  = args[0];
+  const amount  = parseInt(args[1]);
+
+  if (!lineId || isNaN(amount)) {
+    reply = '⚠️ Usage: <code>/updatespent [line-id] [amount]</code>\n';
+    reply += 'Example: <code>/updatespent b1 55000</code>\n\n';
+    reply += '<b>Line IDs:</b>\n';
+    reply += 'b1=Code Camps, b2=HQ Program, b3=SHEisDEVCON\n';
+    reply += 'b4=Mentors, b5=PR/Media, b6=Merch\n';
+    reply += 'b7=DEVCON Kids, b8=Assets, b9=Travel\n';
+    reply += 'b10=Admin Fee, bvat=VAT';
+  } else {
+    const budget = await kvGetParsed('budget', KV_URL, KV_TOKEN);
+    if (!budget) {
+      reply = '⚠️ No budget data found. Open dashboard first.';
+    } else {
+      const line = budget.find(b => b.id === lineId);
+      if (!line) {
+        reply = `⚠️ Line <code>${lineId}</code> not found.\nUse b1–b10 or bvat.`;
+      } else {
+        const oldSpent = line.spent;
+        line.spent = amount;
+        await kvSet('budget', budget, KV_URL, KV_TOKEN);
+        const pct = Math.round(amount / line.alloc * 100);
+        const status = amount > line.alloc ? '🔴 OVER BUDGET' : pct > 80 ? '🟠 HIGH' : '🟢 OK';
+        reply = `✅ <b>Budget updated — Line ${line.num}</b>\n`;
+        reply += `${line.name}\n\n`;
+        reply += `Previous: ₱${oldSpent.toLocaleString()}\n`;
+        reply += `New: ₱${amount.toLocaleString()}\n`;
+        reply += `Allocated: ₱${line.alloc.toLocaleString()}\n`;
+        reply += `Remaining: ₱${(line.alloc - amount).toLocaleString()}\n`;
+        reply += `Utilization: ${pct}% ${status}\n\n`;
+        reply += `<i>Refresh dashboard to see changes.</i>`;
+      }
+    }
+  }
+}
+
     // ─────────────────────────────────────────
     // /status — quick summary
     // ─────────────────────────────────────────
@@ -380,6 +425,30 @@ const newTask = {
         reply += `<i>Use /tasks or /risks for details</i>`;
       }
     }
+
+  else if (command === '/budget') {
+  const budget = await kvGetParsed('budget', KV_URL, KV_TOKEN);
+  if (!budget) {
+    reply = '⚠️ No budget data found. Open dashboard first.';
+  } else {
+    const opLines = budget.filter(b => !b.vat);
+    const totalSpent = opLines.reduce((sum, l) => sum + l.spent, 0);
+    const totalAlloc = 1000000;
+    const remaining = totalAlloc - totalSpent;
+
+    reply = `💰 <b>DEVCON BUDGET STATUS</b>\n\n`;
+    reply += `Total Allocated: ₱1,120,000\n`;
+    reply += `Subtotal Spent: ₱${totalSpent.toLocaleString()}\n`;
+    reply += `Remaining: ₱${remaining.toLocaleString()}\n\n`;
+    reply += `<b>Line Items:</b>\n`;
+    opLines.forEach(l => {
+      const pct = Math.round(l.spent / l.alloc * 100);
+      const icon = l.spent > l.alloc ? '🔴' : pct > 80 ? '🟠' : '🟢';
+      reply += `${icon} <code>${l.id}</code> Line ${l.num}: ₱${l.spent.toLocaleString()} / ₱${l.alloc.toLocaleString()} (${pct}%)\n`;
+    });
+    reply += `\n<i>Use /updatespent [id] [amount] to update</i>`;
+  }
+}
 
     // ─────────────────────────────────────────
     // /ask — AI assistant
