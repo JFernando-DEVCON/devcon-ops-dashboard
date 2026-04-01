@@ -27,7 +27,7 @@ async function upstashSet(key, value, url, token) {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify([value])
+    body: JSON.stringify(value)  // ← fixed, no array wrapper
   });
   return r.json();
 }
