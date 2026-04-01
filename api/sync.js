@@ -2,13 +2,15 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const { KV_REST_API_URL, KV_REST_API_TOKEN } = process.env;
   try {
-    const { tasks, risks, chapters } = req.body;
-    await Promise.all([
+    const { tasks, risks, chapters, budget } = req.body;
+    const ops = [
       kvSet('tasks',     tasks,    KV_REST_API_URL, KV_REST_API_TOKEN),
       kvSet('risks',     risks,    KV_REST_API_URL, KV_REST_API_TOKEN),
       kvSet('chapters',  chapters, KV_REST_API_URL, KV_REST_API_TOKEN),
       kvSet('synced_at', new Date().toISOString(), KV_REST_API_URL, KV_REST_API_TOKEN),
-    ]);
+    ];
+    if (budget) ops.push(kvSet('budget', budget, KV_REST_API_URL, KV_REST_API_TOKEN));
+    await Promise.all(ops);
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('Sync error:', err);
