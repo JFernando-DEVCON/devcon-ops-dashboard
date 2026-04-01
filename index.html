@@ -1045,13 +1045,14 @@ async function refreshAI() {
 // TELEGRAM
 // ══════════════════════════════════════════════════════════════
 function getTgCreds(){
-  return{
-    tok: document.getElementById('tg-token').value.trim(),
+  return {
+    tok: 'server', // token is handled server-side via /api/telegram
     cid: document.getElementById('tg-chatid').value.trim()
   };
 }
 async function tgPost(text){
   const {cid} = getTgCreds();
+  if(!cid) throw new Error('Missing chat ID — enter your GC chat ID first');
   const r = await fetch('/api/telegram', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1072,10 +1073,10 @@ async function testTg(){
   catch(e){tgLog('✗ '+e.message,'err');}
 }
 async function findChatId(){
-  const {tok}=getTgCreds(); if(!tok){alert('Enter bot token first.');return;}
   try{
-    const r=await fetch(`https://api.telegram.org/bot${tok}/getUpdates`);
-    const d=await r.json(); if(!d.ok) throw new Error(d.description);
+    const r = await fetch('/api/getchatid');
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.description || d.error);
     if(!d.result.length){tgLog('No updates yet — send a message to the bot/group first','err');return;}
     const ids=[...new Set(d.result.map(u=>{const c=u.message?.chat||u.channel_post?.chat;return c?`${c.title||c.first_name}: ${c.id}`:null}).filter(Boolean))];
     tgLog('Found: '+ids.join(' | '),'ok');
