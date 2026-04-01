@@ -896,13 +896,103 @@ function renderBudget() {
   const opLines = budget.filter(l=>!l.vat);
   const vatLine = budget.find(l=>l.vat);
 
+  const rows = opLines.map(l=>{
+    const rem = l.alloc - l.spent;
+    const pct = Math.min(Math.round(l.spent/l.alloc*100),120);
+    const over = l.spent > l.alloc;
+    if(over) overruns++;
+    totalSpent += l.spent;
+    const barCls = over?'over':pct>80?'warn':'ok';
+    const remCls = over?'c-red':pct>80?'c-org':'c-grn';
+    const isAdmin = String(l.num)==='10';
+    return `<tr style="${isAdmin?'background:rgba(240,165,53,.04)':''}">
+      <td style="font-family:var(--mono);font-size:10px;color:var(--dim)">${l.num}</td>
+      <td>
+        <div class="bline" style="${isAdmin?'color:var(--acc)':''}">${l.name}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${l.note}</div>
+      </td>
+      <td class="bamt">₱${l.alloc.toLocaleString()}</td>
+      <td class="bamt ${over?'over':pct>80?'warn':'ok'}">
+        ₱${l.spent.toLocaleString()}${over?' ⚠':''}
+        <button onclick="editSpent('${l.id}')" style="margin-left:6px;background:transparent;border:1px solid var(--bdr);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:8px;color:var(--dim);cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'" title="Edit spent amount">✏️ EDIT</button>
+      </td>
+      <td class="bamt ${remCls}">₱${Math.abs(rem).toLocaleString()}${over?' OVER':''}</td>
+      <td>
+        <div class="bbar"><div class="bfill ${barCls}" style="width:${Math.min(pct,100)}%"></div></div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${pct}%${over?' (OVER)':''}</div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Subtotal — live calculated
+  const subtotalRow = `
+    <tr class="budget-total-row">
+      <td></td>
+      <td style="font-family:var(--hdg);font-size:12px;font-weight:700">SUBTOTAL (Lines 1–10, excl. VAT)</td>
+      <td class="bamt" style="font-weight:700">₱1,000,000</td>
+      <td class="bamt ${totalSpent>1000000?'over':'ok'}" style="font-weight:700">₱${totalSpent.toLocaleString()}</td>
+      <td class="bamt ${totalSpent>1000000?'c-red':'c-grn'}" style="font-weight:700">₱${Math.abs(1000000-totalSpent).toLocaleString()}${totalSpent>1000000?' OVER':''}</td>
+      <td></td>
+    </tr>`;
+
+  // VAT row
+  const vatRow = vatLine ? `
+    <tr style="background:rgba(79,195,247,.04)">
+      <td style="font-family:var(--mono);font-size:10px;color:var(--blu)">VAT</td>
+      <td>
+        <div class="bline" style="color:var(--blu)">${vatLine.name}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${vatLine.note}</div>
+      </td>
+      <td class="bamt" style="color:var(--blu)">₱${vatLine.alloc.toLocaleString()}</td>
+      <td class="bamt" style="color:var(--sub)">₱0 <span style="font-size:9px">(tracked by BIR)</span></td>
+      <td class="bamt c-blu">₱${vatLine.alloc.toLocaleString()}</td>
+      <td><div style="font-family:var(--mono);font-size:9px;color:var(--blu)">BIR COMPLIANCE</div></td>
+    </tr>` : '';
+
+  // Grand total — live calculated
+  const grandTotal = 1000000 + (vatLine?.alloc||0);
+  const grandSpent = totalSpent;
+  const grandRemaining = grandTotal - grandSpent;
+  const grandTotalRow = `
+    <tr style="background:var(--s3);border-top:2px solid var(--acc)">
+      <td></td>
+      <td style="font-family:var(--hdg);font-size:13px;font-weight:800;color:var(--acc)">GRAND TOTAL (incl. 12% VAT)</td>
+      <td class="bamt" style="font-weight:800;color:var(--acc)">₱${grandTotal.toLocaleString()}</td>
+      <td class="bamt" style="font-weight:700;color:var(--sub)">₱${grandSpent.toLocaleString()}</td>
+      <td class="bamt ${grandRemaining<0?'c-red':'c-grn'}" style="font-weight:700">₱${Math.abs(grandRemaining).toLocaleString()} ${grandRemaining<0?'OVER':'avail.'}</td>
+      <td></td>
+    </tr>`;
+
+  document.getElementById('budget-tbody').innerHTML = rows + subtotalRow + vatRow + grandTotalRow;
+
+  // Update stat cards — all live
+  document.getElementById('b-committed').textContent = '₱'+(totalSpent/1000).toFixed(0)+'k';
+  document.getElementById('b-remaining').textContent = '₱'+Math.max(0,(1000000-totalSpent)/1000).toFixed(0)+'k';
+  document.getElementById('b-overruns').textContent = overruns;
+
+  document.getElementById('payments-list').innerHTML = CONFIRMED_PAYMENTS.map(p=>`
+    <div style="display:flex;gap:16px;align-items:baseline;padding:3px 0">
+      <span style="color:var(--grn)">✓</span>
+      <span style="color:var(--txt);font-weight:500">₱${p.amount.toLocaleString()}</span>
+      <span style="color:var(--sub)">${p.payee}</span>
+      <span style="color:var(--dim)">${p.date}</span>
+      <span style="color:var(--dim);font-size:9px">${p.note}</span>
+    </div>`).join('');
+}
+
 function editSpent(budgetId) {
   const line = budget.find(b => b.id === budgetId);
   if (!line) return;
-  const newVal = prompt(`Update spent for Line ${line.num} — ${line.name}\nCurrent: ₱${line.spent.toLocaleString()}\n\nEnter new amount:`, line.spent);
-  if (newVal === null) return; // cancelled
-  const parsed = parseInt(newVal.replace(/[₱,]/g, ''));
-  if (isNaN(parsed) || parsed < 0) { alert('Invalid amount. Enter a number like 50000'); return; }
+  const newVal = prompt(
+    `Update Spent — Line ${line.num}\n${line.name}\n\nCurrent: ₱${line.spent.toLocaleString()}\nAllocated: ₱${line.alloc.toLocaleString()}\n\nEnter new spent amount:`,
+    line.spent
+  );
+  if (newVal === null) return;
+  const parsed = parseInt(String(newVal).replace(/[₱,\s]/g, ''));
+  if (isNaN(parsed) || parsed < 0) {
+    alert('Invalid amount. Enter a number like 50000');
+    return;
+  }
   line.spent = parsed;
   saveState();
   renderBudget();
