@@ -290,10 +290,12 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <div class="page" id="page-tasks">
   <div class="pg-header">
     <div><div class="pg-title">National Tasks</div><div class="pg-sub">HQ ACTION ITEMS · JEDD & DOM</div></div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-ghost btn-sm" onclick="clearDone('tasks')">CLEAR DONE</button>
-      <button class="btn btn-acc btn-sm" onclick="showAddTask()">+ ADD TASK</button>
-    </div>
+<div style="display:flex;gap:8px;align-items:center">
+  <span style="font-family:var(--mono);font-size:9px;color:var(--dim)" id="sync-status"></span>
+  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+  <button class="btn btn-ghost btn-sm" onclick="clearDone('tasks')">CLEAR DONE</button>
+  <button class="btn btn-acc btn-sm" onclick="addTask('medium',{value:'',focus:true})">+ ADD TASK</button>
+</div>
   </div>
 
   <div class="card" id="tasks-critical-card">
@@ -604,6 +606,24 @@ function loadTgCfg() {
   } catch (err) {
     console.warn('⚠ Could not load from server, using local data:', err.message);
   }
+}
+
+async function manualRefresh() {
+  const status = document.getElementById('sync-status');
+  if (status) status.textContent = '⏳ Syncing...';
+  await loadFromServer();
+  if (status) {
+    status.textContent = '✅ Synced ' + new Date().toLocaleTimeString();
+    setTimeout(() => status.textContent = '', 4000);
+  }
+}
+
+// Auto-poll every 30 seconds when dashboard is open
+function startAutoPoll() {
+  setInterval(async () => {
+    await loadFromServer();
+    console.log('🔄 Auto-refreshed from server');
+  }, 30000); // every 30 seconds
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1208,6 +1228,7 @@ window.addEventListener('load', async ()=>{
     document.getElementById('pw-gate').style.display='none';
     document.getElementById('app-shell').style.display='grid';
     await loadFromServer(); // ← pulls latest from Upstash
+    startAutoPoll();
   } else {
     document.getElementById('pw-input').focus();
   }
