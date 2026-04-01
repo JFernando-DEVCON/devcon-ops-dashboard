@@ -231,7 +231,10 @@ else if (command === '/addtask') {
 
       // Debug log
       console.log('tasks type:', typeof tasks);
+      console.log('tasks full value:', JSON.stringify(tasks)?.slice(0, 500));
       console.log('tasks keys:', tasks ? Object.keys(tasks) : 'null');
+      console.log('tasks.high type:', typeof tasks?.high);
+      console.log('tasks.high value:', JSON.stringify(tasks?.high)?.slice(0, 200));
 
       if (!tasks) {
         reply = '⚠️ No dashboard data found. Open the dashboard first.';
