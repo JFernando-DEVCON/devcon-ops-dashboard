@@ -583,6 +583,29 @@ function loadTgCfg() {
   if(t) document.getElementById('sched-time').value = t;
 }
 
+  async function loadFromServer() {
+  try {
+    const [tasksRes, risksRes, chaptersRes] = await Promise.all([
+      fetch('/api/get?key=tasks'),
+      fetch('/api/get?key=risks'),
+      fetch('/api/get?key=chapters'),
+    ]);
+    const [t, r, c] = await Promise.all([
+      tasksRes.json(), risksRes.json(), chaptersRes.json()
+    ]);
+    if (t.data) tasks    = t.data;
+    if (r.data) risks    = r.data;
+    if (c.data) chapters = c.data;
+    renderOverview();
+    renderTasks();
+    renderChapters();
+    renderRisks();
+    console.log('✅ Loaded fresh data from server');
+  } catch (err) {
+    console.warn('⚠ Could not load from server, using local data:', err.message);
+  }
+}
+
 // ══════════════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════════════
@@ -1179,11 +1202,12 @@ const dn=new Date();
 document.getElementById('date-lbl').textContent=dn.toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
 
 // Init
-window.addEventListener('load',()=>{
+window.addEventListener('load', async ()=>{
   // Password gate
   if(sessionStorage.getItem('pw_ok')==='1'){
     document.getElementById('pw-gate').style.display='none';
     document.getElementById('app-shell').style.display='grid';
+    await loadFromServer(); // ← pulls latest from Upstash
   } else {
     document.getElementById('pw-input').focus();
   }
