@@ -917,14 +917,15 @@ function getTgCreds(){
   };
 }
 async function tgPost(text){
-  const {cid}=getTgCreds();
-  if(!cid) throw new Error('Missing chat ID');
-  const r=await fetch('/api/telegram',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({chatId:cid,text})
+  const {cid} = getTgCreds();
+  const r = await fetch('/api/telegram', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chatId: cid, text })
   });
-  const d=await r.json(); if(!d.ok) throw new Error(d.description||'Send failed'); return d;
+  const d = await r.json();
+  if(!d.ok) throw new Error(d.description || 'Send failed');
+  return d;
 }
 function tgLog(msg,cls='info'){
   const log=document.getElementById('tg-log');
