@@ -104,23 +104,34 @@ export default async function handler(req, res) {
     // ─────────────────────────────────────────
     // /help — list all commands
     // ─────────────────────────────────────────
-    if (command === '/help') {
-      reply = `🤖 <b>DEVCON Ops Bot — Commands</b>\n\n`;
-      reply += `<b>📋 Task Commands:</b>\n`;
-      reply += `/tasks — list all open tasks with IDs\n`;
-      reply += `/done [id] — mark task as done\n`;
-      reply += `/undone [id] — mark task as not done\n`;
-      reply += `/addtask [priority] [text] @[assignee] — add task\n`;
-      reply += `  priorities: <code>critical</code> <code>high</code> <code>medium</code>\n`;
-      reply += `  example: <code>/addtask high Follow up Rolf @Rolf</code>\n`;
-      reply += `/deltask [id] — delete a task\n\n`;
-      reply += `<b>⚠️ Risk Commands:</b>\n`;
-      reply += `/risks — list all open risks with IDs\n`;
-      reply += `/resolve [id] — mark risk as resolved\n\n`;
-      reply += `<b>📊 Info Commands:</b>\n`;
-      reply += `/status — quick summary of open items\n`;
-      reply += `/ask [question] — ask the AI assistant anything\n`;
-    }
+if (command === '/help') {
+  reply = `🤖 <b>DEVCON Ops Bot — Commands</b>\n\n`;
+
+  reply += `<b>📋 Task Commands:</b>\n`;
+  reply += `/tasks — list all open tasks with IDs\n`;
+  reply += `/done [id] — mark task as done\n`;
+  reply += `/undone [id] — mark task as not done\n`;
+  reply += `/addtask [priority] [text] @[assignee] — add new task\n`;
+  reply += `  priorities: <code>critical</code> <code>high</code> <code>medium</code>\n`;
+  reply += `  example: <code>/addtask high Follow up Rolf @Rolf</code>\n`;
+  reply += `/deltask [id] — delete a task\n\n`;
+
+  reply += `<b>⚠️ Risk Commands:</b>\n`;
+  reply += `/risks — list all open risks with IDs\n`;
+  reply += `/resolve [id] — mark risk as resolved\n\n`;
+
+  reply += `<b>📊 Info Commands:</b>\n`;
+  reply += `/status — quick summary of open items\n`;
+  reply += `/ping — check if bot is online\n\n`;
+
+  reply += `<b>🤖 AI Assistant:</b>\n`;
+  reply += `/ask [question] — ask anything about ops data\n`;
+  reply += `  example: <code>/ask what is the remaining budget?</code>\n`;
+  reply += `  example: <code>/ask sino may pending na tasks?</code>\n`;
+  reply += `  example: <code>/ask total reimbursement summary</code>\n\n`;
+
+  reply += `<i>💡 Tip: You can also reply to any bot message to ask follow-up questions in English or Filipino 🇵🇭</i>`;
+}
 
     // ─────────────────────────────────────────
     // /tasks — list all open tasks with IDs
