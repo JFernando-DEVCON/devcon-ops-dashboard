@@ -138,14 +138,4 @@ export default async function handler(req, res) {
     return res.status(200).end(); // always return 200 to Telegram
   }
 }
-```
 
----
-
-## Step 2 — Add `ANTHROPIC_API_KEY` to Vercel
-
-1. Go to [console.anthropic.com](https://console.anthropic.com) → **API Keys** → create one
-2. Go to Vercel → your project → **Settings → Environment Variables**
-3. Add:
-```
-   ANTHROPIC_API_KEY = sk-ant-xxxxxxxxxxxxxxxx
