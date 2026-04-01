@@ -214,37 +214,47 @@ export default async function handler(req, res) {
     // ─────────────────────────────────────────
     // /addtask [priority] [text] @[assignee]
     // ─────────────────────────────────────────
-    else if (command === '/addtask') {
-      const priority = args[0]?.toLowerCase();
-      if (!['critical', 'high', 'medium'].includes(priority)) {
-        reply = '⚠️ Usage: <code>/addtask [critical|high|medium] [task text] @[assignee]</code>\nExample: <code>/addtask high Follow up Rolf on Tacloban @Rolf</code>';
-      } else {
-        const remaining = args.slice(1).join(' ');
-        const assignMatch = remaining.match(/@(\w+)/);
-        const assign = assignMatch ? assignMatch[1] : 'Unassigned';
-        const taskText = remaining.replace(/@\w+/, '').trim();
+else if (command === '/addtask') {
+  const priority = args[0]?.toLowerCase();
+  if (!['critical', 'high', 'medium'].includes(priority)) {
+    reply = '⚠️ Usage: <code>/addtask [critical|high|medium] [task text] @[assignee]</code>\nExample: <code>/addtask high Follow up Rolf on Tacloban @Rolf</code>';
+  } else {
+    const remaining = args.slice(1).join(' ');
+    const assignMatch = remaining.match(/@(\w+)/);
+    const assign = assignMatch ? assignMatch[1] : 'Unassigned';
+    const taskText = remaining.replace(/@\w+/, '').trim();
 
-        if (!taskText) {
-          reply = '⚠️ Please include a task description.';
-        } else {
-          const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
-          if (!tasks) { reply = '⚠️ No dashboard data found.'; }
-          else {
-            const newTask = {
-              id: 't' + Date.now(),
-              text: taskText,
-              assign,
-              due: '',
-              done: false
-            };
-            tasks[priority].push(newTask);
-            await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
-            const prioIcon = priority === 'critical' ? '🔴' : priority === 'high' ? '🟠' : '🟡';
-            reply = `${prioIcon} <b>Task added to ${priority}:</b>\n${taskText}\n👤 Assigned to: ${assign}\n🆔 ID: <code>${newTask.id}</code>\n\n<i>Dashboard will reflect on next load.</i>`;
-          }
-        }
+    if (!taskText) {
+      reply = '⚠️ Please include a task description.';
+    } else {
+      let tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+
+      // Debug log
+      console.log('tasks type:', typeof tasks);
+      console.log('tasks keys:', tasks ? Object.keys(tasks) : 'null');
+
+      if (!tasks) {
+        reply = '⚠️ No dashboard data found. Open the dashboard first.';
+      } else if (!tasks[priority]) {
+        // Structure exists but priority array missing — initialize it
+        tasks[priority] = [];
+        reply = `⚠️ Priority array was missing, initialized. Try again.`;
+      } else {
+        const newTask = {
+          id: 't' + Date.now(),
+          text: taskText,
+          assign,
+          due: '',
+          done: false
+        };
+        tasks[priority].push(newTask);
+        await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+        const prioIcon = priority === 'critical' ? '🔴' : priority === 'high' ? '🟠' : '🟡';
+        reply = `${prioIcon} <b>Task added to ${priority}:</b>\n${taskText}\n👤 Assigned to: ${assign}\n🆔 ID: <code>${newTask.id}</code>\n\n<i>Refresh dashboard to see changes.</i>`;
       }
     }
+  }
+}
 
     // ─────────────────────────────────────────
     // /deltask [id] — delete a task
