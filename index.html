@@ -219,16 +219,16 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 /* ── Password Gate ── */
 #pw-gate{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column}
 #pw-gate::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 50% at 50% 50%,rgba(245,166,35,.06),transparent)}
-.pw-box{background:var(--s1);border:1px solid var(--bdr2);border-radius:16px;padding:40px 44px;display:flex;flex-direction:column;align-items:center;gap:20px;min-width:340px;box-shadow:0 32px 80px rgba(0,0,0,.7);position:relative;z-index:1}
+.pw-box{background:var(--s1);border:1px solid var(--bdr2);border-radius:20px;padding:56px 64px;display:flex;flex-direction:column;align-items:center;gap:24px;min-width:480px;box-shadow:0 32px 80px rgba(0,0,0,.7);position:relative;z-index:1}
 .pw-box::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.3}
-.pw-logo{font-family:var(--hdg);font-size:28px;font-weight:900;color:var(--txt);text-align:center;line-height:1.05;letter-spacing:-.02em}
+.pw-logo{font-family:var(--hdg);font-size:42px;font-weight:900;color:var(--txt);text-align:center;line-height:1.05;letter-spacing:-.02em}
 .pw-logo span{color:var(--acc)}
-.pw-sub{font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;text-align:center}
-.pw-input{width:100%;background:var(--s2);border:1px solid var(--bdr2);border-radius:10px;padding:12px 16px;font-family:var(--mono);font-size:14px;color:var(--txt);outline:none;text-align:center;letter-spacing:2px;transition:border-color .2s,box-shadow .2s}
+.pw-sub{font-family:var(--mono);font-size:12px;letter-spacing:3px;color:var(--sub);text-transform:uppercase;text-align:center}
+.pw-input{width:100%;background:var(--s2);border:1px solid var(--bdr2);border-radius:12px;padding:16px 20px;font-family:var(--mono);font-size:17px;color:var(--txt);outline:none;text-align:center;letter-spacing:2px;transition:border-color .2s,box-shadow .2s}
 .pw-input:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(245,166,35,.1)}
-.pw-btn{width:100%;background:linear-gradient(135deg,var(--acc),var(--acc2));border:none;border-radius:10px;padding:12px;font-family:var(--hdg);font-size:14px;font-weight:800;color:#08090c;cursor:pointer;letter-spacing:.5px;transition:all .2s}
+.pw-btn{width:100%;background:linear-gradient(135deg,var(--acc),var(--acc2));border:none;border-radius:12px;padding:16px;font-family:var(--hdg);font-size:18px;font-weight:800;color:#08090c;cursor:pointer;letter-spacing:.5px;transition:all .2s}
 .pw-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(245,166,35,.35)}
-.pw-err{font-family:var(--mono);font-size:11px;color:var(--red);height:14px;text-align:center}
+.pw-err{font-family:var(--mono);font-size:13px;color:var(--red);height:18px;text-align:center}
 .pw-shake{animation:shake .35s ease}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 
@@ -365,10 +365,10 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   .btn-sm{padding:4px 8px;font-size:8px}
 
   /* Password gate */
-  .pw-box{min-width:auto;width:88%;padding:28px 20px;gap:16px}
-  .pw-logo{font-size:22px}
-  .pw-input{font-size:13px;padding:10px 14px}
-  .pw-btn{font-size:13px;padding:11px}
+  .pw-box{min-width:auto;width:90%;padding:36px 28px;gap:18px}
+  .pw-logo{font-size:30px}
+  .pw-input{font-size:15px;padding:13px 16px}
+  .pw-btn{font-size:15px;padding:14px}
 }
 
 /* Extra small phones */
