@@ -4,18 +4,44 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const BOT_TOKEN     = process.env.TELEGRAM_BOT_TOKEN;
-  const CHAT_ID       = process.env.TELEGRAM_CHAT_ID;
-  const KV_URL        = process.env.KV_REST_API_URL;
-  const KV_TOKEN      = process.env.KV_REST_API_TOKEN;
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  const CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
+  const KV_URL    = process.env.KV_REST_API_URL;
+  const KV_TOKEN  = process.env.KV_REST_API_TOKEN;
 
   try {
     // Fetch live data from Upstash
-    const [tasks, risks, chapters] = await Promise.all([
+    const [rawTasks, rawRisks, rawChapters] = await Promise.all([
       kvGet('tasks',    KV_URL, KV_TOKEN),
       kvGet('risks',    KV_URL, KV_TOKEN),
       kvGet('chapters', KV_URL, KV_TOKEN),
     ]);
+
+    // Log what we got for debugging
+    console.log('Raw tasks type:', typeof rawTasks);
+    console.log('Raw tasks:', JSON.stringify(rawTasks)?.slice(0, 200));
+
+    // Parse if still a string, otherwise use directly
+    const tasks    = typeof rawTasks    === 'string' ? JSON.parse(rawTasks)    : rawTasks;
+    const risks    = typeof rawRisks    === 'string' ? JSON.parse(rawRisks)    : rawRisks;
+    const chapters = typeof rawChapters === 'string' ? JSON.parse(rawChapters) : rawChapters;
+
+    // Null check
+    if (!tasks || !risks || !chapters) {
+      return res.status(500).json({
+        ok: false,
+        error: 'No dashboard data in Upstash. Open dashboard and make a change to sync.'
+      });
+    }
+
+    // Validate structure
+    if (!tasks.critical || !tasks.high || !tasks.medium) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Invalid tasks structure',
+        received: JSON.stringify(tasks).slice(0, 300)
+      });
+    }
 
     const now           = new Date();
     const days          = Math.ceil((new Date('2026-06-30') - now) / 864e5);
@@ -37,21 +63,18 @@ export default async function handler(req, res) {
       timeZone: 'Asia/Manila'
     })}\n\n`;
 
-    // Critical risks
     if (criticalRisks.length) {
       msg += `🚨 <b>FOR APPROVAL / CRITICAL</b>\n`;
       criticalRisks.forEach(r => msg += `🔴 <b>${r.title}</b>\n   → ${r.action}\n`);
       msg += '\n';
     }
 
-    // High risks
     if (highRisks.length) {
       msg += `⚠️ <b>HIGH RISKS</b>\n`;
       highRisks.slice(0, 3).forEach(r => msg += `🟠 ${r.title}\n   → ${r.action}\n`);
       msg += '\n';
     }
 
-    // Open tasks
     msg += `✅ <b>OPEN TASKS (${totalActive} active)</b>\n`;
     if (criticalOpen.length) {
       msg += `<b>🔴 Critical:</b>\n`;
@@ -67,14 +90,12 @@ export default async function handler(req, res) {
     }
     msg += '\n';
 
-    // KPI
     msg += `📊 <b>KPI SNAPSHOT</b>\n`;
     msg += `Code Camps: <b>${doneCamps}/5</b> completed\n`;
     msg += `Days to Q2: <b>${days} days</b>\n`;
     msg += `Grant: ✅ PAID ₱1,120,000\n`;
     msg += `Open Risks: <b>${allOpenRisks.length}</b>\n\n`;
 
-    // Upcoming camps
     if (upcomingCamps.length) {
       msg += `📅 <b>UPCOMING CAMPS</b>\n`;
       upcomingCamps.forEach(c => msg += `• ${c.name} — ${c.date} (${c.status.toUpperCase()})\n`);
@@ -104,15 +125,26 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, sent: true });
 
   } catch (err) {
-    console.error('Cron error:', err);
+    console.error('Cron error:', err.message);
     return res.status(500).json({ ok: false, error: err.message });
   }
 }
 
 async function kvGet(key, url, token) {
-  const r = await fetch(`${url}/get/${key}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  const data = await r.json();
-  return JSON.parse(data.result);
+  try {
+    const r = await fetch(`${url}/get/${key}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await r.json();
+    if (!data.result) return null;
+    // Upstash sometimes double-encodes — handle both cases
+    const parsed = typeof data.result === 'string'
+      ? JSON.parse(data.result)
+      : data.result;
+    // If still a string (double encoded), parse again
+    return typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+  } catch (err) {
+    console.error(`kvGet error for key "${key}":`, err.message);
+    return null;
+  }
 }
