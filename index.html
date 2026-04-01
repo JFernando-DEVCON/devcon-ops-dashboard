@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEVCON OPS DASHBOARD</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap');
+:root{
+  --bg:#08090c;--s1:#0f1116;--s2:#161a22;--s3:#1c2130;--bdr:#222736;
+  --acc:#f0a535;--blu:#4fc3f7;--grn:#56c97a;--red:#f44747;--org:#ff8c42;--pur:#b39ddb;
+  --txt:#dde1f0;--sub:#8890aa;--dim:#444d66;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--hdg:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);min-height:100vh}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(240,165,53,.06),transparent);pointer-events:none;z-index:0}
+
+/* ── Layout ── */
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh;position:relative;z-index:1}
+
+/* ── Sidebar ── */
+.sidebar{background:var(--s1);border-right:1px solid var(--bdr);padding:20px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{padding:0 18px 20px;border-bottom:1px solid var(--bdr);margin-bottom:16px}
+.logo-tag{font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--acc);text-transform:uppercase;margin-bottom:4px}
+.logo-name{font-family:var(--hdg);font-size:18px;font-weight:800;color:var(--txt);line-height:1.1}
+.logo-sub{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:3px}
+.nav-section{padding:0 12px;margin-bottom:8px}
+.nav-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;padding:0 6px;margin-bottom:6px;display:block}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;cursor:pointer;transition:all .15s;font-size:13px;font-weight:500;color:var(--sub);border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--s2);color:var(--txt)}
+.nav-item.active{background:rgba(240,165,53,.12);color:var(--acc);border:1px solid rgba(240,165,53,.2)}
+.nav-item .icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-family:var(--mono);font-size:9px;border-radius:10px;padding:1px 6px;font-weight:500}
+.nav-badge.warn{background:var(--org)}
+.nav-badge.ok{background:var(--grn)}
+
+.sidebar-footer{margin-top:auto;padding:16px 18px 0;border-top:1px solid var(--bdr)}
+.clock-box{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.clock-val{font-size:16px;color:var(--sub);letter-spacing:1px}
+
+/* ── Main ── */
+.main{overflow-y:auto;min-height:100vh}
+.page{display:none;padding:28px 28px 60px}
+.page.active{display:block}
+
+/* ── Page header ── */
+.pg-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--bdr)}
+.pg-title{font-family:var(--hdg);font-size:22px;font-weight:800;color:var(--txt)}
+.pg-sub{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:3px;letter-spacing:.5px}
+
+/* ── Stat cards ── */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}
+.stat{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px}
+.stat-lbl{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+.stat-val{font-family:var(--hdg);font-size:22px;font-weight:800;line-height:1}
+.stat-hint{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:3px}
+.c-acc{color:var(--acc)}.c-red{color:var(--red)}.c-grn{color:var(--grn)}.c-blu{color:var(--blu)}.c-org{color:var(--org)}
+
+/* ── Section card ── */
+.card{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;overflow:hidden}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bdr);background:var(--s2)}
+.card-title{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--sub);display:flex;align-items:center;gap:8px}
+.card-body{padding:0}
+
+/* ── Task list ── */
+.task-row{display:grid;grid-template-columns:28px 1fr auto auto auto;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--bdr);transition:background .1s}
+.task-row:last-child{border-bottom:none}
+.task-row:hover{background:rgba(255,255,255,.02)}
+.task-check{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--bdr);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.task-check.done{background:var(--grn);border-color:var(--grn)}
+.task-check.done::after{content:'✓';font-size:10px;color:#0a0b0d;font-weight:700}
+.task-text{font-size:13px;color:var(--txt);font-weight:500;line-height:1.3}
+.task-text.done{color:var(--dim);text-decoration:line-through}
+.task-assign{font-family:var(--mono);font-size:10px;color:var(--blu);background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.15);border-radius:4px;padding:2px 7px;white-space:nowrap}
+.task-due{font-family:var(--mono);font-size:10px;color:var(--sub);white-space:nowrap}
+.task-due.overdue{color:var(--red)}
+.task-prio{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.task-prio.critical{background:var(--red)}.task-prio.high{background:var(--org)}.task-prio.medium{background:var(--acc)}.task-prio.low{background:var(--grn)}
+
+/* Add task row */
+.add-task-row{padding:10px 16px;border-top:1px solid var(--bdr);display:flex;gap:8px;background:var(--s2)}
+.add-input{flex:1;background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:7px 10px;font-family:var(--sans);font-size:12px;color:var(--txt);outline:none}
+.add-input:focus{border-color:var(--acc)}
+.add-input::placeholder{color:var(--dim)}
+.add-btn{background:var(--acc);border:none;border-radius:6px;padding:7px 14px;font-family:var(--mono);font-size:10px;color:#0a0b0d;font-weight:600;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;transition:filter .15s}
+.add-btn:hover{filter:brightness(1.1)}
+
+/* ── Chapter tracker ── */
+.chapter-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px}
+.ch-card{background:var(--s2);border:1px solid var(--bdr);border-radius:9px;padding:14px;cursor:pointer;transition:border-color .2s}
+.ch-card:hover{border-color:var(--acc)}
+.ch-card.expanded{border-color:rgba(240,165,53,.4)}
+.ch-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.ch-name{font-family:var(--hdg);font-size:14px;font-weight:700;color:var(--txt)}
+.ch-city{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px}
+.ch-status-badge{font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.badge-ready{background:rgba(86,201,122,.12);color:var(--grn);border:1px solid rgba(86,201,122,.25)}
+.badge-ontrack{background:rgba(79,195,247,.12);color:var(--blu);border:1px solid rgba(79,195,247,.25)}
+.badge-atrisk{background:rgba(255,140,66,.12);color:var(--org);border:1px solid rgba(255,140,66,.25)}
+.badge-pending{background:rgba(240,165,53,.1);color:var(--acc);border:1px solid rgba(240,165,53,.2)}
+.badge-done{background:rgba(86,201,122,.2);color:var(--grn);border:1px solid rgba(86,201,122,.4)}
+.ch-date{font-family:var(--mono);font-size:10px;color:var(--sub);margin-bottom:8px}
+.ch-lead{font-family:var(--mono);font-size:10px;color:var(--sub)}
+.ch-progress{margin-top:10px}
+.ch-prog-bar{height:4px;background:var(--bdr);border-radius:2px;margin-top:5px;overflow:hidden}
+.ch-prog-fill{height:100%;border-radius:2px;transition:width .5s}
+.ch-checklist{margin-top:12px;display:none;border-top:1px solid var(--bdr);padding-top:12px}
+.ch-checklist.open{display:block}
+.ch-check-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;color:var(--sub)}
+.ch-check-item.done{color:var(--dim)}
+.ch-dot{width:6px;height:6px;border-radius:50%;background:var(--bdr);flex-shrink:0}
+.ch-dot.done{background:var(--grn)}.ch-dot.active{background:var(--acc)}.ch-dot.blocked{background:var(--red)}
+
+/* ── Budget tracker ── */
+.budget-table{width:100%;border-collapse:collapse}
+.budget-table th{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);padding:10px 16px;border-bottom:1px solid var(--bdr);text-align:left;background:var(--s2)}
+.budget-table th:nth-child(3),.budget-table th:nth-child(4),.budget-table th:nth-child(5){text-align:right}
+.budget-table td{padding:11px 16px;border-bottom:1px solid var(--bdr);font-size:12px;vertical-align:middle}
+.budget-table tr:last-child td{border-bottom:none}
+.budget-table tr:hover td{background:rgba(255,255,255,.015)}
+.bline{font-weight:600;color:var(--txt)}
+.bamt{font-family:var(--mono);font-size:11px;text-align:right}
+.bamt.over{color:var(--red)}.bamt.ok{color:var(--grn)}.bamt.warn{color:var(--org)}
+.bbar{width:100%;height:5px;background:var(--bdr);border-radius:3px;overflow:hidden;min-width:80px}
+.bfill{height:100%;border-radius:3px;transition:width .6s}
+.bfill.ok{background:var(--grn)}.bfill.warn{background:var(--org)}.bfill.over{background:var(--red)}
+.budget-total-row td{background:var(--s2);font-weight:600;border-top:2px solid var(--bdr)}
+
+/* ── Risk tracker ── */
+.risk-row{display:grid;grid-template-columns:8px 1fr 120px 100px 36px;align-items:start;gap:12px;padding:13px 16px;border-bottom:1px solid var(--bdr);transition:background .1s}
+.risk-row:last-child{border-bottom:none}
+.risk-row:hover{background:rgba(255,255,255,.02)}
+.risk-sev{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.risk-sev.critical{background:var(--red)}.risk-sev.high{background:var(--org)}.risk-sev.medium{background:var(--acc)}.risk-sev.low{background:var(--grn)}
+.risk-body{}
+.risk-title{font-size:13px;font-weight:600;color:var(--txt);margin-bottom:3px}
+.risk-action{font-family:var(--mono);font-size:10px;color:var(--sub);line-height:1.4}
+.risk-owner{font-family:var(--mono);font-size:10px;color:var(--blu);background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.15);border-radius:4px;padding:3px 8px;text-align:center;white-space:nowrap}
+.risk-tag{font-family:var(--mono);font-size:9px;padding:3px 7px;border-radius:4px;text-transform:uppercase;text-align:center;white-space:nowrap}
+.risk-tag.open{background:rgba(244,71,71,.1);color:var(--red);border:1px solid rgba(244,71,71,.2)}
+.risk-tag.watching{background:rgba(255,140,66,.1);color:var(--org);border:1px solid rgba(255,140,66,.2)}
+.risk-tag.resolved{background:rgba(86,201,122,.1);color:var(--grn);border:1px solid rgba(86,201,122,.2)}
+.resolve-btn{background:transparent;border:1px solid var(--bdr);border-radius:5px;padding:4px 6px;color:var(--dim);font-size:11px;cursor:pointer;transition:all .15s}
+.resolve-btn:hover{border-color:var(--grn);color:var(--grn)}
+
+/* ── Telegram panel (compact) ── */
+.tg-bar{background:var(--s2);border:1px solid rgba(79,195,247,.2);border-radius:9px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tg-bar-label{font-family:var(--mono);font-size:10px;color:var(--blu);letter-spacing:1px;text-transform:uppercase;flex-shrink:0}
+.tg-mini-input{background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:7px 10px;font-family:var(--mono);font-size:11px;color:var(--txt);outline:none;flex:1;min-width:140px}
+.tg-mini-input:focus{border-color:var(--blu)}
+.tg-mini-input::placeholder{color:var(--dim)}
+.tg-log-mini{font-family:var(--mono);font-size:10px;color:var(--sub);margin-left:auto;white-space:nowrap}
+.tg-log-mini.ok{color:var(--grn)}.tg-log-mini.err{color:var(--red)}
+
+/* ── Buttons ── */
+.btn{font-family:var(--mono);font-size:10px;letter-spacing:.8px;padding:7px 14px;border-radius:6px;border:1px solid;cursor:pointer;transition:all .15s;text-transform:uppercase;white-space:nowrap}
+.btn-acc{background:var(--acc);border-color:var(--acc);color:#08090c;font-weight:700}
+.btn-acc:hover{filter:brightness(1.1)}.btn-acc:disabled{opacity:.45;cursor:not-allowed}
+.btn-blu{background:rgba(79,195,247,.1);border-color:rgba(79,195,247,.25);color:var(--blu)}
+.btn-blu:hover{background:rgba(79,195,247,.2)}
+.btn-ghost{background:transparent;border-color:var(--bdr);color:var(--sub)}
+.btn-ghost:hover{border-color:var(--sub);color:var(--txt)}
+.btn-red{background:rgba(244,71,71,.1);border-color:rgba(244,71,71,.25);color:var(--red)}
+.btn-sm{padding:4px 10px;font-size:9px}
+
+/* ── Progress pill ── */
+.prog-pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(240,165,53,.1);color:var(--acc);border:1px solid rgba(240,165,53,.2)}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}
+
+/* ── Responsive ── */
+@media(max-width:700px){
+  .app{grid-template-columns:1fr}
+  .sidebar{position:relative;height:auto;flex-direction:row;flex-wrap:wrap;padding:12px}
+  .chapter-grid{grid-template-columns:1fr}
+  .stat-row{grid-template-columns:1fr 1fr}
+}
+
+/* ── Password Gate ── */
+#pw-gate{position:fixed;inset:0;background:#08090c;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0}
+.pw-box{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:40px 44px;display:flex;flex-direction:column;align-items:center;gap:18px;min-width:340px;box-shadow:0 32px 80px rgba(0,0,0,.6)}
+.pw-logo{font-family:var(--hdg);font-size:28px;font-weight:800;color:var(--txt);text-align:center;line-height:1.1}
+.pw-logo span{color:var(--acc)}
+.pw-sub{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;text-align:center}
+.pw-input{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:12px 16px;font-family:var(--mono);font-size:14px;color:var(--txt);outline:none;text-align:center;letter-spacing:2px;transition:border-color .2s}
+.pw-input:focus{border-color:var(--acc)}
+.pw-btn{width:100%;background:var(--acc);border:none;border-radius:8px;padding:12px;font-family:var(--hdg);font-size:14px;font-weight:700;color:#08090c;cursor:pointer;letter-spacing:1px;transition:filter .15s}
+.pw-btn:hover{filter:brightness(1.1)}
+.pw-err{font-family:var(--mono);font-size:11px;color:var(--red);height:14px;text-align:center}
+.pw-shake{animation:shake .35s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+</style>
+</head>
+<body>
+<!-- ── PASSWORD GATE ── -->
+<div id="pw-gate">
+  <div class="pw-box">
+    <div class="pw-logo">DEVCON<br><span>OPS DASHBOARD</span></div>
+    <div class="pw-sub">Sui × MOU 2026 · Restricted Access</div>
+    <input class="pw-input" id="pw-input" type="password" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
+    <div class="pw-err" id="pw-err"></div>
+    <button class="pw-btn" onclick="checkPw()">UNLOCK →</button>
+  </div>
+</div>
+
+<div class="app" id="app-shell" style="display:none">
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-tag">DEVCON PH</div>
+    <div class="logo-name">OPS<br>DASHBOARD</div>
+    <div class="logo-sub">SUI × MOU 2026</div>
+  </div>
+
+  <div class="nav-section">
+    <span class="nav-label">Navigation</span>
+    <button class="nav-item active" onclick="nav('overview')"><span class="icon">🏠</span>Overview<span class="nav-badge warn" id="nb-overview">—</span></button>
+    <button class="nav-item" onclick="nav('tasks')"><span class="icon">✅</span>National Tasks<span class="nav-badge" id="nb-tasks">—</span></button>
+    <button class="nav-item" onclick="nav('chapters')"><span class="icon">🗺️</span>Chapter Tracker<span class="nav-badge ok" id="nb-chapters">5</span></button>
+    <button class="nav-item" onclick="nav('budget')"><span class="icon">💰</span>Budget<span class="nav-badge warn" id="nb-budget">!</span></button>
+    <button class="nav-item" onclick="nav('risks')"><span class="icon">⚠️</span>Risks<span class="nav-badge" id="nb-risks">—</span></button>
+  </div>
+
+  <div class="nav-section" style="margin-top:8px">
+    <span class="nav-label">Daily Brief</span>
+    <button class="nav-item" onclick="nav('telegram')"><span class="icon">✈️</span>Telegram Notify</button>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="clock-box">
+      <div style="font-size:9px;letter-spacing:1px;margin-bottom:2px">LOCAL TIME</div>
+      <div class="clock-val" id="clock">--:--:--</div>
+    </div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:6px" id="date-lbl"></div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">Q2 Deadline: Jun 30</div>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<main class="main">
+
+<!-- ─── OVERVIEW ─── -->
+<div class="page active" id="page-overview">
+  <div class="pg-header">
+    <div><div class="pg-title">Good morning, Dom. 👋</div><div class="pg-sub">DEVCON × SUI MOU · OPERATIONAL OVERVIEW · 2026</div></div>
+    <button class="btn btn-acc" onclick="refreshAI()">⚡ AI BRIEFING</button>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat"><div class="stat-lbl">Code Camps</div><div class="stat-val c-acc" id="ov-camps">0 / 5</div><div class="stat-hint">completed</div></div>
+    <div class="stat"><div class="stat-lbl">Days to Q2</div><div class="stat-val c-org" id="ov-days">—</div><div class="stat-hint">Jun 30 deadline</div></div>
+    <div class="stat"><div class="stat-lbl">Grant</div><div class="stat-val c-grn">✓ PAID</div><div class="stat-hint">₱1,120,000</div></div>
+    <div class="stat"><div class="stat-lbl">Open Risks</div><div class="stat-val c-red" id="ov-risks">—</div><div class="stat-hint">need action</div></div>
+  </div>
+
+  <!-- AI Brief -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">🤖 AI DAILY BRIEF</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--dim)" id="brief-ts">not generated</span>
+    </div>
+    <div style="padding:16px;font-family:var(--mono);font-size:12px;line-height:1.85;color:#8890aa;white-space:pre-wrap;word-break:break-word;min-height:80px" id="brief-body">Click "AI Briefing" to generate today's ops summary.</div>
+  </div>
+
+  <!-- Quick events -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">📅 UPCOMING EVENTS</span></div>
+    <div id="events-list"></div>
+  </div>
+</div>
+
+<!-- ─── NATIONAL TASKS ─── -->
+<div class="page" id="page-tasks">
+  <div class="pg-header">
+    <div><div class="pg-title">National Tasks</div><div class="pg-sub">HQ ACTION ITEMS · JEDD & DOM</div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="clearDone('tasks')">CLEAR DONE</button>
+      <button class="btn btn-acc btn-sm" onclick="showAddTask()">+ ADD TASK</button>
+    </div>
+  </div>
+
+  <div class="card" id="tasks-critical-card">
+    <div class="card-head"><span class="card-title">🔴 CRITICAL — NEEDS ACTION NOW</span><span class="prog-pill" id="tasks-crit-prog">0/0</span></div>
+    <div id="tasks-critical"></div>
+    <div class="add-task-row"><input class="add-input" id="add-critical" placeholder="Add critical task..." onkeydown="if(event.key==='Enter')addTask('critical',this)"><button class="add-btn" onclick="addTask('critical',document.getElementById('add-critical'))">ADD</button></div>
+  </div>
+
+  <div class="card" id="tasks-high-card">
+    <div class="card-head"><span class="card-title">🟠 HIGH PRIORITY</span><span class="prog-pill" id="tasks-high-prog">0/0</span></div>
+    <div id="tasks-high"></div>
+    <div class="add-task-row"><input class="add-input" id="add-high" placeholder="Add high priority task..." onkeydown="if(event.key==='Enter')addTask('high',this)"><button class="add-btn" onclick="addTask('high',document.getElementById('add-high'))">ADD</button></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">🟡 THIS WEEK</span><span class="prog-pill" id="tasks-med-prog">0/0</span></div>
+    <div id="tasks-medium"></div>
+    <div class="add-task-row"><input class="add-input" id="add-medium" placeholder="Add task..." onkeydown="if(event.key==='Enter')addTask('medium',this)"><button class="add-btn" onclick="addTask('medium',document.getElementById('add-medium'))">ADD</button></div>
+  </div>
+</div>
+
+<!-- ─── CHAPTER TRACKER ─── -->
+<div class="page" id="page-chapters">
+  <div class="pg-header">
+    <div><div class="pg-title">Chapter Code Camp Tracker</div><div class="pg-sub">5 EVENTS · NATIONWIDE · BY JUN 24, 2026</div></div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--sub)" id="camps-done-label">0 of 5 complete</span>
+    </div>
+  </div>
+
+  <div class="stat-row" style="grid-template-columns:repeat(5,1fr)">
+    <div class="stat"><div class="stat-lbl">Manila</div><div class="stat-val" id="ch-stat-1" style="font-size:16px">⏳</div><div class="stat-hint">Mar 28</div></div>
+    <div class="stat"><div class="stat-lbl">Tacloban</div><div class="stat-val" id="ch-stat-2" style="font-size:16px">📋</div><div class="stat-hint">Apr 11</div></div>
+    <div class="stat"><div class="stat-lbl">Iloilo</div><div class="stat-val" id="ch-stat-3" style="font-size:16px">🔧</div><div class="stat-hint">May 16</div></div>
+    <div class="stat"><div class="stat-lbl">Bukidnon</div><div class="stat-val" id="ch-stat-4" style="font-size:16px">⚠️</div><div class="stat-hint">May 6</div></div>
+    <div class="stat"><div class="stat-lbl">Pampanga</div><div class="stat-val" id="ch-stat-5" style="font-size:16px">📌</div><div class="stat-hint">Jun 24</div></div>
+  </div>
+
+  <div class="chapter-grid" id="chapter-grid"></div>
+</div>
+
+<!-- ─── BUDGET ─── -->
+<div class="page" id="page-budget">
+  <div class="pg-header">
+    <div><div class="pg-title">Budget Tracker</div><div class="pg-sub">ANNEX A · SUI FOUNDATION GRANT · ₱1,000,000 SUBTOTAL + 12% VAT ₱120,000 = ₱1,120,000</div></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--sub)">Grand Total: ₱1,120,000 · 20% Admin Fee (Line 10)</div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat"><div class="stat-lbl">Total Budget</div><div class="stat-val c-acc">₱1.12M</div><div class="stat-hint">incl. 12% VAT</div></div>
+    <div class="stat"><div class="stat-lbl">Committed</div><div class="stat-val c-org" id="b-committed">—</div><div class="stat-hint">paid + pending</div></div>
+    <div class="stat"><div class="stat-lbl">Remaining</div><div class="stat-val c-grn" id="b-remaining">—</div><div class="stat-hint">available</div></div>
+    <div class="stat"><div class="stat-lbl">Overruns</div><div class="stat-val c-red" id="b-overruns">—</div><div class="stat-hint">lines over budget</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">📊 ANNEX A — LINE ITEM STATUS</span></div>
+    <table class="budget-table" id="budget-table">
+      <thead><tr><th>#</th><th>Budget Line</th><th>Allocated</th><th>Spent / Committed</th><th>Remaining</th><th style="min-width:100px">Utilization</th></tr></thead>
+      <tbody id="budget-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">💳 CONFIRMED PAYMENTS</span></div>
+    <div id="payments-list" style="padding:14px;font-family:var(--mono);font-size:11px;line-height:2;color:var(--sub)"></div>
+  </div>
+</div>
+
+<!-- ─── RISKS ─── -->
+<div class="page" id="page-risks">
+  <div class="pg-header">
+    <div><div class="pg-title">Risks to Manage</div><div class="pg-sub">OPEN ISSUES · FLAGGED FOR DOM & JEDD</div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="addRiskPrompt()">+ ADD RISK</button>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat"><div class="stat-lbl">Critical</div><div class="stat-val c-red" id="r-crit">—</div><div class="stat-hint">immediate action</div></div>
+    <div class="stat"><div class="stat-lbl">High</div><div class="stat-val c-org" id="r-high">—</div><div class="stat-hint">this week</div></div>
+    <div class="stat"><div class="stat-lbl">Medium</div><div class="stat-val c-acc" id="r-med">—</div><div class="stat-hint">monitor</div></div>
+    <div class="stat"><div class="stat-lbl">Resolved</div><div class="stat-val c-grn" id="r-res">—</div><div class="stat-hint">closed</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">🚨 RISK REGISTER</span></div>
+    <div id="risk-list"></div>
+  </div>
+</div>
+
+<!-- ─── TELEGRAM ─── -->
+<div class="page" id="page-telegram">
+  <div class="pg-header">
+    <div><div class="pg-title">Telegram Notifications</div><div class="pg-sub">DAILY DSU SUMMARY · CHANNEL/GROUP</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">⚙️ BOT CONFIGURATION</span></div>
+    <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">BOT TOKEN</div>
+        <input class="tg-mini-input" id="tg-token" type="password" placeholder="123456:ABC-DEFxxx..." style="width:100%" oninput="saveTgCfg()">
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">CHAT ID / @USERNAME</div>
+        <input class="tg-mini-input" id="tg-chatid" type="text" placeholder="-100123456789 or @channel" style="width:100%" oninput="saveTgCfg()">
+      </div>
+    </div>
+    <div style="padding:0 16px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-blu" onclick="testTg()">📡 TEST</button>
+      <button class="btn btn-ghost" onclick="findChatId()">🔍 FIND CHAT ID</button>
+      <div style="margin-left:auto">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:4px">AUTO-SEND TIME</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="tg-mini-input" id="sched-time" type="time" value="08:00" style="width:100px" onchange="saveTgCfg()">
+          <button class="btn btn-ghost" id="sched-btn" onclick="toggleSched()">▶ START</button>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--grn)" id="sched-next"></span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:10px 16px;background:var(--s2);border-top:1px solid var(--bdr);font-family:var(--mono);font-size:10px;color:var(--sub)">
+      <b style="color:var(--blu)">SETUP:</b> 1) @BotFather → /newbot → paste token &nbsp;|&nbsp; 2) Add bot to channel/group as Admin &nbsp;|&nbsp; 3) Find Chat ID below
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="btn btn-acc" onclick="sendDailySummary()">📤 SEND DAILY SUMMARY</button>
+    <button class="btn btn-blu" onclick="sendCriticalOnly()">🚨 SEND CRITICAL ONLY</button>
+    <button class="btn btn-ghost" onclick="sendKpiSnapshot()">📊 KPI SNAPSHOT</button>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">📋 SEND LOG</span></div>
+    <div id="tg-log" style="padding:14px;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--sub);min-height:60px;max-height:240px;overflow-y:auto">Waiting for send actions...</div>
+  </div>
+</div>
+
+</main>
+</div><!-- end app-shell -->
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// DATA — seeded from project context
+// ══════════════════════════════════════════════════════════════
+const TASKS = {
+  critical: [
+    {id:'t1',text:'Submit Manila liquidation — BIR invoices: McDo ₱3,600, Jollibee ₱7,595, Bayleaf ₱52,500, JCR ₱71,940',assign:'Jedd',due:'Apr 4',done:false},
+    {id:'t2',text:'Resolve Bukidnon ₱10,000 wrong bank number — RESOLVED ✓',assign:'Jedd',due:'Mar 31',done:true},
+    {id:'t3',text:'Confirm Bukidnon ₱5,000 additional seed fund — RESOLVED ✓',assign:'Dom',due:'Mar 31',done:true},
+    {id:'t4',text:'Lock Tacloban new date (May or Jun) — confirm with Rolf this week',assign:'Rolf',due:'Apr 4',done:false},
+  ],
+  high: [
+    {id:'t5',text:'Collect GDrive-linked BIR invoice photos from all Manila vendors (unique URL per row)',assign:'Jedd',due:'Apr 4',done:false},
+    {id:'t6',text:'Create DeepSurge listing for student project submissions — @zero_x_j',assign:'Jianyi',due:'Apr 3',done:false},
+    {id:'t6b',text:'Collect BIR invoice for DEVCON Kids ₱50,000 spend — Microbit/Hour of AI vendor',assign:'Jedd',due:'Apr 7',done:false},
+    {id:'t7',text:'Confirm Iloilo chapter lead for Apr 18 SHEisDEVCON FWTF Summit (Marica)',assign:'Dom',due:'Apr 1',done:false},
+    {id:'t8',text:'Update Lazada account: DEVCONNECT PH INC + TIN 010-398-4140 for BIR invoices',assign:'Jedd',due:'Apr 3',done:false},
+    {id:'t9b',text:'Bukidnon: start ocular at BSU + lab installation planning (T-30 from May 6)',assign:'Zhi',due:'Apr 6',done:false},
+    {id:'t9',text:'Tacloban: complete formal ocular at LNU before new event date T-30',assign:'Rolf',due:'TBC',done:false},
+  ],
+  high_done: [
+    {id:'td1',text:'Manila Code Camp (Part 1) — Letran — COMPLETED ✓',assign:'Lady',due:'Mar 28',done:true},
+    {id:'td2',text:'Bayleaf Media/Community Dinner (Part 2) — COMPLETED ✓',assign:'Jedd',due:'Mar 28',done:true},
+    {id:'td3',text:'Tacloban Dry Run — Mar 31 — COMPLETED ✓',assign:'Rolf',due:'Mar 31',done:true},
+  ],
+  medium: [
+    {id:'t10',text:'Process Dom umbrella reimbursement ₱8,239.92 from DEVCON ops fund',assign:'Jedd',due:'Apr 3',done:false},
+    {id:'t11',text:'Send Iloilo seed fund guidelines + Sui/ABA/BOI logos to Ted (Iloilo chapter)',assign:'Jedd',due:'Apr 5',done:false},
+    {id:'t12',text:'Iloilo WVSU lab ocular visit — schedule T-30 from Apr 18',assign:'Marica',due:'Apr 5',done:false},
+    {id:'t13',text:'Pampanga: Joash to share CCA confirmation in Sui GC + start mentor recruitment',assign:'Joash',due:'Apr 7',done:false},
+    {id:'t14',text:'Begin Iloilo (May 16) — CPU Jaro ocular and install planning T-30',assign:'Ted',due:'Apr 16',done:false},
+    {id:'t15',text:'Draft Q2 narrative report outline for Sui Foundation (deadline Jun 30)',assign:'Dom',due:'May 1',done:false},
+  ]
+};
+
+const CHAPTERS = [
+  {id:1,name:'Manila',city:'NCR — Intramuros',lead:'Lady Diane Casilang',date:'Mar 28, 2026',venue:'Colegio de San Juan de Letran',pax:150,status:'done',
+   checks:[
+    {label:'Ocular visit done',done:true},{label:'Lab installation done',done:true},{label:'Dry run complete',done:true},
+    {label:'Mentors trained (5+)',done:true},{label:'Part 1 code camp (9AM-4PM) ✓ DONE',done:true},{label:'Bayleaf media/community dinner (6-9PM) ✓ DONE',done:true},
+    {label:'BIR invoices collected',done:false},{label:'Liquidation submitted to Jedd',done:false}
+   ]},
+  {id:2,name:'Tacloban – EV',city:'Eastern Visayas',lead:'Rolf Genree Garces',date:'TBC — May or Jun 2026',venue:'Leyte Normal University',pax:100,status:'pending',
+   checks:[
+    {label:'Ocular visit done',done:false},{label:'Lab installation',done:false},{label:'Dry run (Mar 31) ✓ DONE',done:true},
+    {label:'Mentors trained (5+)',done:true},{label:'Reschedule confirmed (May/Jun)',done:false},{label:'Seed fund received',done:false},
+    {label:'BIR invoices collected',done:false},{label:'Liquidation submitted',done:false}
+   ]},
+  {id:3,name:'Iloilo – WV',city:'Iloilo City (WVSU Apr 18 / CPU May 16)',lead:'Marica (Apr 18) / Ted (May 16)',date:'May 16, 2026',venue:'Central Philippine University, Jaro',pax:120,status:'pending',
+   checks:[
+    {label:'Chapter lead confirmed',done:false},{label:'Ocular visit',done:false},{label:'Lab installation',done:false},
+    {label:'Dry run',done:false},{label:'Mentors trained (5+)',done:false},{label:'Seed fund received',done:false},
+    {label:'BIR invoices collected',done:false},{label:'Liquidation submitted',done:false}
+   ]},
+  {id:4,name:'Bukidnon',city:'Bukidnon, Mindanao',lead:'Zhi (chapter contact)',date:'May 6, 2026',venue:'Bukidnon State University',pax:100,status:'ontrack',
+   checks:[
+    {label:'Ocular visit',done:false},{label:'Lab installation',done:false},{label:'Dry run',done:false},
+    {label:'Mentors trained',done:false},{label:'Seed fund ₱10k received ✓ RESOLVED',done:true},
+    {label:'₱5k additional received ✓ RESOLVED',done:true},{label:'BIR invoices',done:false},{label:'Liquidation',done:false}
+   ]},
+  {id:5,name:'Pampanga',city:'Angeles City, Pampanga',lead:'Joash Requiez',date:'Jun 24, 2026',venue:'City College of Angeles',pax:130,status:'pending',
+   checks:[
+    {label:'Venue confirmed (CCA)',done:true},{label:'Chapter lead confirmed',done:true},{label:'Mentor recruitment',done:false},
+    {label:'Ocular visit',done:false},{label:'Lab installation',done:false},{label:'Dry run (late May)',done:false},
+    {label:'BIR invoices',done:false},{label:'Liquidation',done:false}
+   ]},
+];
+
+// BUDGET REALLOCATION NOTES (Mar 28 2026):
+// Line 6 merch overrun ₱33,102 → reallocated to Line 3 (SHEisDEVCON merch)
+// Bayleaf ₱52,500 + ₱10,000 merch partial → moved to Line 5 (PR & Media Launch)
+// Line 1 adjusted: removes Bayleaf, retains food + JCR code camp costs only
+// Line 10 renamed: Standard Non-Profit 20% Admin Fee per sustainability model
+// Line 11 (VAT): 12% VAT compliance on ₱1,000,000 subtotal = ₱120,000
+const BUDGET_LINES = [
+  {num:1, name:'Code Camps Executions + Top 1 KPI',            alloc:200000, spent:49940,  note:'Food (McDo ₱3,600 + Jollibee ₱7,595) + JCR code camp materials partial. Bayleaf moved to Line 5.'},
+  {num:2, name:'HQ Program Head & Core Contributors',           alloc:130000, spent:39969,  note:'CA#7 intern allowances (Feb–Apr), HQARR comms, monthly rep'},
+  {num:3, name:'Campus DEVCON / SHEisDEVCON Events',           alloc:80000,  spent:43102,  note:'Iloilo seed fund ₱10,000 + SHEisDEVCON merch realloc ₱33,102 (overrun from Line 6)'},
+  {num:4, name:'Code Camp Mentor Training',                     alloc:100000, spent:10000,  note:'Michael Lance Q1 representation (15 sessions × ₱500–₱1,000)'},
+  {num:5, name:'PR & Media Launch Kickoff Event',               alloc:70000,  spent:62500,  note:'Bayleaf community dinner ₱52,500 + ₱10,000 merch partial (totes/banners for PR)'},
+  {num:6, name:'Partnership Merchandise – Top Contributors',    alloc:100000, spent:100000, note:'JCR ₱71,940 + Lazada ~₱38,922 + Arjay ₱11,000 + Lalamove ₱3,000 + Shopee umbrellas ₱8,239 — ₱33,102 overrun reallocated to Line 3'},
+  {num:7, name:'DEVCON Kids + Microbit + Hour of AI',           alloc:50000,  spent:50000,  note:'FULLY SPENT ✓ — Microbit donations, Hour of AI support, Smart AI Lens hardware. BIR invoice required.'},
+  {num:8, name:'Asset Acquisition & Marketing KPI (Laptop)',    alloc:120000, spent:69500,  note:'Nethkenn Gadgets Invoice #1586: MacBook Air M2 ₱42,000 + iPhone 13 ₱27,500'},
+  {num:9, name:'Travel for Code Camps, Representation & Fly-in Guests', alloc:50000, spent:25000, note:'Cebu Pacific roundtrip Iloilo (Lady + Marica) ~₱25,000 — Tacloban, Bukidnon, Pampanga travel + speaker fly-ins TBC'},
+  {num:10,name:'Standard Non-Profit 20% Admin Fee — Operations, Compliance & Contingency', alloc:100000, spent:10926, note:'20% sustainability admin fee: yearly thank-you lunch ₱10,925 + HQARR load. Remaining absorbs any future compliance/contingency.'},
+  {num:'VAT',name:'12% VAT Compliance (BIR — EOPT Act)',        alloc:120000, spent:0,      note:'12% VAT on ₱1,000,000 subtotal = ₱120,000 per Annex B. Tracked separately. BIR Sales/Service Invoices (not ORs) per EOPT Act.',vat:true},
+];
+
+const CONFIRMED_PAYMENTS = [
+  {ref:'OR-03232026-111753-968923',payee:'Bayleaf Hotel (The Bayleaf)',amount:30500,date:'Mar 23 2026',note:'Remaining balance — FULLY PAID ✓'},
+  {ref:'OR-03232026-114204-969634',payee:'JCR Printing (Edilberto Nera)',amount:71940,date:'Mar 23 2026',note:'Invoice #0729 — prints, merch, banners'},
+  {ref:'ITO260324044106007',payee:'Ted Aspera — Iloilo Chapter',amount:10000,date:'Mar 24 2026',note:'Seed fund — GoTyme → GCash'},
+  {ref:'Separate transfer',payee:'Zhi — Bukidnon Chapter',amount:10000,date:'Mar 2026',note:'⚠ WRONG BANK NUMBER — unresolved'},
+  {ref:'Dom approved',payee:'Zhi — Bukidnon (awards incentive)',amount:5000,date:'Mar 23 2026',note:'₱5k additional — sent by Jedd'},
+  {ref:'Down payment',payee:'Bayleaf Hotel (down payment)',amount:22000,date:'Earlier',note:'First installment — PAID ✓'},
+];
+
+const RISKS = [
+  {id:'r1',title:'Manila Code Camp + Media Event — COMPLETED ✓',desc:'Mar 28 code camp at Letran executed. Bayleaf community dinner/media event completed. BIR invoice collection and liquidation still pending.',sev:'medium',owner:'Jedd',status:'watching',action:'Collect BIR invoices from McDo, Jollibee, Bayleaf. Submit Manila liquidation to HQ Finance.'},
+  {id:'r2',title:'Bukidnon ₱10k seed fund — wrong bank number RESOLVED ✓',desc:'Transfer issue resolved. Correct bank details confirmed from Zhi. Funds received by chapter.',sev:'medium',owner:'Jedd',status:'resolved',action:'Confirm BIR receipt from Bukidnon for seed fund disbursement. Update liquidation sheet.'},
+  {id:'r3',title:'Bukidnon ₱5k additional — RESOLVED ✓',desc:'Dom approved. Jedd disbursed ₱5k awards incentive to Zhi. Chapter has received funds.',sev:'low',owner:'Jedd',status:'resolved',action:'Ensure Bukidnon submits BIR acknowledgment receipt for ₱5k. File with liquidation.'},
+  {id:'r4',title:'Tacloban rescheduled — new date TBC (May or Jun)',desc:'Dry run completed Mar 31 ✓. Apr 11 date moved. New date in May or Jun not yet confirmed. MOU KPI deadline is Jun 30 — limited runway.',sev:'high',owner:'Rolf',status:'open',action:'Rolf to confirm new date this week. Must lock before May 1 to stay within Q2 deadline.'},
+  {id:'r5',title:'DeepSurge listing not yet created',desc:'@zero_x_j (Jianyi) was tasked Mar 26 to create DeepSurge listings per chapter for student project submissions.',sev:'high',owner:'Jianyi',status:'open',action:'Follow up in Sui × DEVCON Telegram. Needed before next camp.'},
+  {id:'r6',title:'Merch overrun ₱33,102 — reallocated to SHEisDEVCON (Line 3)',desc:'Line 6 committed ₱133,102 vs ₱100k budget. Overrun ₱33,102 reallocated to Line 3 (SHEisDEVCON Events) as SHEisDEVCON-specific merch. Line 6 now balanced.',sev:'medium',owner:'Jedd',status:'watching',action:'Confirm Line 3 reallocation in HQ Finance report. Update liquidation sheet line mapping.'},
+  {id:'r7',title:'Iloilo chapter lead not yet confirmed for Apr 18',desc:'FWTF Summit Apr 18 — Marica leads but formal confirmation needed.',sev:'medium',owner:'Dom',status:'open',action:'Confirm Marica as lead. Schedule WVSU ocular ASAP.'},
+  {id:'r8',title:'Dom umbrella reimbursement ₱8,239.92 pending',desc:'Umbrella orders (Shopee) were charged to Dom\'s personal card. Needs reimbursement from DEVCON ops fund.',sev:'medium',owner:'Jedd',status:'open',action:'Process reimbursement to Dom from DEVCON operational fund this week.'},
+  {id:'r9',title:'Lazada VAT invoices — account not updated',desc:'Lazada account still under personal name. Must update to DEVCONNECT PH INC + TIN for BIR-compliant invoices.',sev:'medium',owner:'Jedd',status:'open',action:'Update Lazada billing: DEVCONNECT PH INC, TIN 010-398-4140, Ortigas address.'},
+  {id:'r10',title:'Q2 report — 1 of 5 camps done, Jun 30 deadline',desc:'Manila completed. 4 camps remain. Tacloban rescheduled. Must complete Iloilo, Bukidnon, Pampanga + rescheduled Tacloban by Jun 30.',sev:'medium',owner:'Dom',status:'watching',action:'Lock all remaining camp dates ASAP. Start Q2 report draft after Iloilo.'},
+  {id:'r11',title:'Manila BIR liquidation — not yet submitted',desc:'Code camp done. Bayleaf ₱52,500 and JCR ₱71,940 invoices confirmed. Food receipts (McDo, Jollibee) must still be collected and filed.',sev:'high',owner:'Jedd',status:'open',action:'Collect all BIR invoices from Manila vendors. Submit complete liquidation to HQ Finance within 7 days.'},
+  {id:'r12',title:'DEVCON Kids ₱50k fully spent — BIR invoice needed',desc:'Line 7 fully utilized (₱50,000). Microbit donations, Hour of AI, Smart AI Lens hardware. No BIR invoice on file yet.',sev:'high',owner:'Jedd',status:'open',action:'Collect Sales/Service Invoice from DEVCON Kids / Microbit vendor. File under Line 7 in liquidation sheet.'},
+];
+
+// ══════════════════════════════════════════════════════════════
+// STATE (session)
+// ══════════════════════════════════════════════════════════════
+let tasks = JSON.parse(sessionStorage.getItem('tasks')||'null') || structuredClone(TASKS);
+let risks = JSON.parse(sessionStorage.getItem('risks')||'null') || structuredClone(RISKS);
+let chapters = JSON.parse(sessionStorage.getItem('chapters')||'null') || structuredClone(CHAPTERS);
+let schedActive = false, schedInterval = null;
+
+function saveState() {
+  sessionStorage.setItem('tasks', JSON.stringify(tasks));
+  sessionStorage.setItem('risks', JSON.stringify(risks));
+  sessionStorage.setItem('chapters', JSON.stringify(chapters));
+}
+function saveTgCfg() {
+  sessionStorage.setItem('tg_tok', document.getElementById('tg-token').value);
+  sessionStorage.setItem('tg_cid', document.getElementById('tg-chatid').value);
+  sessionStorage.setItem('sched_t', document.getElementById('sched-time').value);
+}
+function loadTgCfg() {
+  document.getElementById('tg-token').value = sessionStorage.getItem('tg_tok')||'';
+  document.getElementById('tg-chatid').value = sessionStorage.getItem('tg_cid')||'';
+  const t = sessionStorage.getItem('sched_t');
+  if(t) document.getElementById('sched-time').value = t;
+}
+
+// ══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════════
+function nav(page) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{
+    if(n.getAttribute('onclick')===`nav('${page}')`) n.classList.add('active');
+  });
+  if(page==='tasks') renderTasks();
+  if(page==='chapters') renderChapters();
+  if(page==='budget') renderBudget();
+  if(page==='risks') renderRisks();
+  if(page==='overview') renderOverview();
+}
+
+// ══════════════════════════════════════════════════════════════
+// OVERVIEW
+// ══════════════════════════════════════════════════════════════
+function renderOverview() {
+  const days = Math.ceil((new Date('2026-06-30')-new Date())/(864e5));
+  document.getElementById('ov-days').textContent = days > 0 ? days : '!';
+  const openRisks = risks.filter(r=>r.status==='open').length;
+  document.getElementById('ov-risks').textContent = openRisks;
+  document.getElementById('ov-camps').textContent = '1 / 5';
+  updateNavBadges();
+
+  // Events
+  const events = [
+    {date:'Mar 28',name:'✅ Manila × Letran — Code Camp DONE',status:'COMPLETE',cls:'c-grn'},
+    {date:'Mar 28',name:'✅ Bayleaf — Media / Community Dinner DONE',status:'COMPLETE',cls:'c-grn'},
+    {date:'Mar 31',name:'✅ Tacloban Dry Run — DONE (date moved)',status:'DONE',cls:'c-grn'},
+    {date:'Apr 18',name:'Iloilo × WVSU — SHEisDEVCON FWTF Summit (ABA)',status:'18 DAYS',cls:'c-blu'},
+    {date:'May 6',name:'Bukidnon × BSU — Sui Move Code Camp',status:'36 DAYS',cls:'c-sub'},
+    {date:'May 16',name:'Iloilo × CPU — Sui Code Camp #1 Iloilo',status:'46 DAYS',cls:'c-sub'},
+    {date:'TBC',name:'Tacloban × LNU — Rescheduled (May or Jun)',status:'⚠ TBC',cls:'c-org'},
+    {date:'Jun 24',name:'Pampanga × CCA — Sui Move Code Camp',status:'85 DAYS',cls:'c-sub'},
+    {date:'Jun 30',name:'Q2 Narrative Report → Sui Foundation',status:'DEADLINE',cls:'c-red'},
+  ];
+  document.getElementById('events-list').innerHTML = events.map(e=>`
+    <div style="display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--bdr)">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--dim);width:48px;flex-shrink:0">${e.date}</span>
+      <span style="flex:1;font-size:13px;font-weight:500;color:var(--txt)">${e.name}</span>
+      <span style="font-family:var(--mono);font-size:9px;class="${e.cls}" padding:2px 8px;border-radius:4px;background:var(--s2);color:var(--sub);white-space:nowrap">${e.status}</span>
+    </div>`).join('');
+}
+
+function updateNavBadges() {
+  const openCrit = tasks.critical.filter(t=>!t.done).length;
+  const openHigh = tasks.high.filter(t=>!t.done).length;
+  const openRisks = risks.filter(r=>r.status==='open').length;
+  document.getElementById('nb-overview').textContent = openCrit + openHigh;
+  document.getElementById('nb-overview').className = 'nav-badge ' + (openCrit>0?'':'warn');
+  document.getElementById('nb-tasks').textContent = openCrit + openHigh + tasks.medium.filter(t=>!t.done).length;
+  document.getElementById('nb-risks').textContent = openRisks;
+  document.getElementById('nb-risks').className = 'nav-badge ' + (openRisks > 5 ? '' : 'warn');
+}
+
+// ══════════════════════════════════════════════════════════════
+// TASKS
+// ══════════════════════════════════════════════════════════════
+function renderTasks() {
+  ['critical','high','medium'].forEach(prio=>{
+    const list = document.getElementById('tasks-'+prio);
+    const items = tasks[prio];
+    list.innerHTML = items.map((t,i)=>`
+      <div class="task-row" id="tr-${t.id}">
+        <div class="task-check ${t.done?'done':''}" onclick="toggleTask('${prio}',${i})"></div>
+        <div class="task-text ${t.done?'done':''}">${h(t.text)}</div>
+        <span class="task-assign">${h(t.assign||'—')}</span>
+        <span class="task-due ${isDue(t.due)?'overdue':''}">${t.due||''}</span>
+        <div class="task-prio ${prio}"></div>
+      </div>`).join('');
+    const done = items.filter(t=>t.done).length;
+    document.getElementById('tasks-'+prio.replace('medium','med')+'-prog').textContent = `${done}/${items.length}`;
+  });
+  updateNavBadges();
+}
+
+function toggleTask(prio, idx) {
+  tasks[prio][idx].done = !tasks[prio][idx].done;
+  saveState(); renderTasks();
+}
+
+function addTask(prio, input) {
+  const text = input.value.trim();
+  if(!text) return;
+  const id = 't'+Date.now();
+  tasks[prio].push({id,text,assign:'Jedd',due:'',done:false});
+  input.value='';
+  saveState(); renderTasks();
+}
+
+function clearDone(section) {
+  ['critical','high','medium'].forEach(p=>{ tasks[p]=tasks[p].filter(t=>!t.done); });
+  saveState(); renderTasks();
+}
+
+function isDue(due) {
+  if(!due) return false;
+  // simple check — if "Mar 28" and today is after, highlight
+  return false; // simplified
+}
+
+// ══════════════════════════════════════════════════════════════
+// CHAPTERS
+// ══════════════════════════════════════════════════════════════
+function renderChapters() {
+  const statusMap = {ready:'badge-ready',ontrack:'badge-ontrack',atrisk:'badge-atrisk',pending:'badge-pending',done:'badge-done'};
+  const statusLabel = {ready:'READY',ontrack:'ON TRACK',atrisk:'AT RISK',pending:'PENDING',done:'DONE ✓'};
+
+  document.getElementById('chapter-grid').innerHTML = chapters.map(c=>{
+    const done = c.checks.filter(x=>x.done).length;
+    const pct = Math.round(done/c.checks.length*100);
+    const barCls = c.status==='atrisk'?'over':c.status==='done'?'ok':pct>60?'ok':'warn';
+    return `
+    <div class="ch-card" id="ch-${c.id}" onclick="toggleChapter(${c.id})">
+      <div class="ch-top">
+        <div>
+          <div class="ch-name">${c.name}</div>
+          <div class="ch-city">${c.city}</div>
+        </div>
+        <span class="ch-status-badge ${statusMap[c.status]}">${statusLabel[c.status]}</span>
+      </div>
+      <div class="ch-date">📅 ${c.date} · ${c.venue}</div>
+      <div class="ch-lead">👤 ${c.lead} · 🎯 ${c.pax} pax target</div>
+      <div class="ch-progress">
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--dim)">
+          <span>CHECKLIST PROGRESS</span><span>${done}/${c.checks.length} — ${pct}%</span>
+        </div>
+        <div class="ch-prog-bar"><div class="ch-prog-fill ${barCls}" style="width:${pct}%"></div></div>
+      </div>
+      <div class="ch-checklist" id="cl-${c.id}">
+        ${c.checks.map((ck,i)=>`
+          <div class="ch-check-item ${ck.done?'done':''}" onclick="event.stopPropagation();toggleCheck(${c.id},${i})">
+            <div class="ch-dot ${ck.done?'done':'active'}"></div>
+            <span>${h(ck.label)}</span>
+          </div>`).join('')}
+        <div style="display:flex;gap:6px;margin-top:10px" onclick="event.stopPropagation()">
+          <select class="tg-mini-input" style="flex:1;font-size:10px" onchange="updateChapterStatus(${c.id},this.value)">
+            <option value="ready" ${c.status==='ready'?'selected':''}>READY</option>
+            <option value="ontrack" ${c.status==='ontrack'?'selected':''}>ON TRACK</option>
+            <option value="atrisk" ${c.status==='atrisk'?'selected':''}>AT RISK</option>
+            <option value="pending" ${c.status==='pending'?'selected':''}>PENDING</option>
+            <option value="done" ${c.status==='done'?'selected':''}>DONE ✓</option>
+          </select>
+          <button class="btn btn-acc btn-sm" onclick="markCampDone(${c.id})">MARK DONE</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Update mini status icons
+  const icons = {ready:'⏳',ontrack:'📋',atrisk:'⚠️',pending:'📌',done:'✅'};
+  chapters.forEach(c=>{
+    const el = document.getElementById('ch-stat-'+c.id);
+    if(el) el.textContent = icons[c.status]||'📋';
+  });
+  const done = chapters.filter(c=>c.status==='done').length;
+  document.getElementById('camps-done-label').textContent = `${done} of 5 complete`;
+  document.getElementById('ov-camps').textContent = `${done} / 5`;
+}
+
+function toggleChapter(id) {
+  const cl = document.getElementById('cl-'+id);
+  cl.classList.toggle('open');
+  document.getElementById('ch-'+id).classList.toggle('expanded');
+}
+
+function toggleCheck(chId, checkIdx) {
+  const ch = chapters.find(c=>c.id===chId);
+  if(ch) ch.checks[checkIdx].done = !ch.checks[checkIdx].done;
+  saveState(); renderChapters();
+}
+
+function updateChapterStatus(chId, status) {
+  const ch = chapters.find(c=>c.id===chId);
+  if(ch) ch.status = status;
+  saveState(); renderChapters();
+}
+
+function markCampDone(chId) {
+  const ch = chapters.find(c=>c.id===chId);
+  if(ch){ ch.status='done'; ch.checks.forEach(c=>c.done=true); }
+  saveState(); renderChapters();
+}
+
+// ══════════════════════════════════════════════════════════════
+// BUDGET
+// ══════════════════════════════════════════════════════════════
+function renderBudget() {
+  let totalSpent=0, overruns=0;
+  const opLines = BUDGET_LINES.filter(l=>!l.vat);
+  const vatLine = BUDGET_LINES.find(l=>l.vat);
+
+  const rows = opLines.map(l=>{
+    const rem = l.alloc - l.spent;
+    const pct = Math.min(Math.round(l.spent/l.alloc*100),120);
+    const over = l.spent > l.alloc;
+    if(over) overruns++;
+    totalSpent += l.spent;
+    const barCls = over?'over':pct>80?'warn':'ok';
+    const remCls = over?'c-red':pct>80?'c-org':'c-grn';
+    // Special styling for Line 10 (admin fee) and VAT
+    const isAdmin = String(l.num)==='10';
+    return `<tr style="${isAdmin?'background:rgba(240,165,53,.04)':''}">
+      <td style="font-family:var(--mono);font-size:10px;color:var(--dim)">${l.num}</td>
+      <td><div class="bline" style="${isAdmin?'color:var(--acc)':''}">${l.name}</div><div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${l.note}</div></td>
+      <td class="bamt">₱${l.alloc.toLocaleString()}</td>
+      <td class="bamt ${over?'over':pct>80?'warn':'ok'}">₱${l.spent.toLocaleString()}${over?' ⚠':''}</td>
+      <td class="bamt ${remCls}">₱${Math.abs(rem).toLocaleString()}${over?' OVER':''}</td>
+      <td><div class="bbar"><div class="bfill ${barCls}" style="width:${Math.min(pct,100)}%"></div></div><div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${pct}%${over?' (OVER)':''}</div></td>
+    </tr>`;
+  }).join('');
+
+  // Subtotal row
+  const subtotalRow = `
+    <tr class="budget-total-row">
+      <td></td>
+      <td style="font-family:var(--hdg);font-size:12px;font-weight:700">SUBTOTAL (Lines 1–10, excl. VAT)</td>
+      <td class="bamt" style="font-weight:700">₱1,000,000</td>
+      <td class="bamt ${totalSpent>1000000?'over':'ok'}" style="font-weight:700">₱${totalSpent.toLocaleString()}</td>
+      <td class="bamt ${totalSpent>1000000?'c-red':'c-grn'}" style="font-weight:700">₱${Math.abs(1000000-totalSpent).toLocaleString()}${totalSpent>1000000?' OVER':''}</td>
+      <td></td>
+    </tr>`;
+
+  // VAT row
+  const vatRow = vatLine ? `
+    <tr style="background:rgba(79,195,247,.04)">
+      <td style="font-family:var(--mono);font-size:10px;color:var(--blu)">VAT</td>
+      <td>
+        <div class="bline" style="color:var(--blu)">${vatLine.name}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${vatLine.note}</div>
+      </td>
+      <td class="bamt" style="color:var(--blu)">₱${vatLine.alloc.toLocaleString()}</td>
+      <td class="bamt" style="color:var(--sub)">₱0 <span style="font-size:9px">(tracked by BIR)</span></td>
+      <td class="bamt c-blu">₱${vatLine.alloc.toLocaleString()}</td>
+      <td><div style="font-family:var(--mono);font-size:9px;color:var(--blu)">BIR COMPLIANCE</div></td>
+    </tr>` : '';
+
+  // Grand total
+  const grandTotal = 1000000 + (vatLine?.alloc||0);
+  const grandTotalRow = `
+    <tr style="background:var(--s3);border-top:2px solid var(--acc)">
+      <td></td>
+      <td style="font-family:var(--hdg);font-size:13px;font-weight:800;color:var(--acc)">GRAND TOTAL (incl. 12% VAT)</td>
+      <td class="bamt" style="font-weight:800;color:var(--acc)">₱${grandTotal.toLocaleString()}</td>
+      <td class="bamt" style="font-weight:700;color:var(--sub)">₱${totalSpent.toLocaleString()}</td>
+      <td class="bamt c-grn" style="font-weight:700">₱${(grandTotal-totalSpent).toLocaleString()} avail.</td>
+      <td></td>
+    </tr>`;
+
+  document.getElementById('budget-tbody').innerHTML = rows + subtotalRow + vatRow + grandTotalRow;
+
+  document.getElementById('b-committed').textContent = '₱'+(totalSpent/1000).toFixed(0)+'k';
+  document.getElementById('b-remaining').textContent = '₱'+Math.max(0,(1000000-totalSpent)/1000).toFixed(0)+'k';
+  document.getElementById('b-overruns').textContent = overruns;
+
+  document.getElementById('payments-list').innerHTML = CONFIRMED_PAYMENTS.map(p=>`
+    <div style="display:flex;gap:16px;align-items:baseline;padding:3px 0">
+      <span style="color:var(--grn)">✓</span>
+      <span style="color:var(--txt);font-weight:500">₱${p.amount.toLocaleString()}</span>
+      <span style="color:var(--sub)">${p.payee}</span>
+      <span style="color:var(--dim)">${p.date}</span>
+      <span style="color:var(--dim);font-size:9px">${p.note}</span>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// RISKS
+// ══════════════════════════════════════════════════════════════
+function renderRisks() {
+  const counts = {critical:0,high:0,medium:0,low:0,resolved:0};
+  risks.forEach(r=>{ if(r.status==='resolved') counts.resolved++; else counts[r.sev]=(counts[r.sev]||0)+1; });
+  document.getElementById('r-crit').textContent = counts.critical||0;
+  document.getElementById('r-high').textContent = counts.high||0;
+  document.getElementById('r-med').textContent = counts.medium||0;
+  document.getElementById('r-res').textContent = counts.resolved||0;
+
+  const sortOrder = {critical:0,high:1,medium:2,low:3};
+  const sorted = [...risks].sort((a,b)=>(sortOrder[a.sev]||9)-(sortOrder[b.sev]||9));
+
+  document.getElementById('risk-list').innerHTML = sorted.map(r=>`
+    <div class="risk-row" id="risk-${r.id}" style="${r.status==='resolved'?'opacity:.4':''}">
+      <div class="risk-sev ${r.sev}"></div>
+      <div class="risk-body">
+        <div class="risk-title">${h(r.title)}</div>
+        <div class="risk-action">${h(r.action)}</div>
+      </div>
+      <div class="risk-owner">${h(r.owner)}</div>
+      <div class="risk-tag ${r.status}">${r.status.toUpperCase()}</div>
+      <button class="resolve-btn" onclick="resolveRisk('${r.id}')" title="Mark resolved">✓</button>
+    </div>`).join('');
+
+  updateNavBadges();
+}
+
+function resolveRisk(id) {
+  const r = risks.find(x=>x.id===id);
+  if(r) r.status = r.status==='resolved'?'open':'resolved';
+  saveState(); renderRisks();
+}
+
+function addRiskPrompt() {
+  const title = prompt('Risk title:'); if(!title) return;
+  const action = prompt('Action item:') || '—';
+  const sev = prompt('Severity (critical/high/medium/low):','high') || 'high';
+  const owner = prompt('Owner:','Dom') || 'Dom';
+  risks.unshift({id:'r'+Date.now(),title,action,desc:'',sev,owner,status:'open'});
+  saveState(); renderRisks();
+}
+
+// ══════════════════════════════════════════════════════════════
+// AI BRIEFING
+// ══════════════════════════════════════════════════════════════
+const AI_PROMPT = `You are the DEVCON × Sui MOU Compliance Agent. Today is March 28, 2026 — Manila Code Camp is TODAY.
+
+FACTS: Grant ₱1,120,000 FULLY PAID. 5 code camps needed. Q2 deadline June 30, 2026. 0 completed.
+EVENTS: Manila TODAY, Tacloban Apr 11 dry run Mar 31, Iloilo May 16, Bukidnon May 6, Pampanga Jun 24.
+RISKS: Bukidnon ₱10k wrong bank. Bukidnon ₱5k pending Dom approval. Tacloban ocular not done. DeepSurge not created. Merch overrun ₱33k. Dom umbrella reimburse ₱8,239.92.
+FINANCE: JCR ₱71,940 ✓. Bayleaf ₱52,500 ✓. Line 6 over budget by ₱33k.
+
+Write a concise DSU-format daily brief (200 words max) for Jedd and Dom. Structure:
+FOR APPROVAL (if any) → CRITICAL TODAY → TOP 3 PRIORITIES → DATES TO REMEMBER
+Use ₱ amounts. Be direct and tactical. No padding.`;
+
+async function refreshAI() {
+  const body = document.getElementById('brief-body');
+  const ts = document.getElementById('brief-ts');
+  body.textContent = '⏳ Generating...';
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:AI_PROMPT}]})
+    });
+    const d = await r.json();
+    const txt = d.content?.find(b=>b.type==='text')?.text || 'No response.';
+    body.innerHTML = h(txt)
+      .replace(/(CRITICAL|⚠|OVERRUN|WRONG)/g,'<span style="color:var(--red)">$1</span>')
+      .replace(/(✓|PAID|DONE|CONFIRMED)/g,'<span style="color:var(--grn)">$1</span>')
+      .replace(/(₱[\d,]+)/g,'<span style="color:var(--acc)">$1</span>');
+    ts.textContent = 'Generated '+new Date().toLocaleTimeString();
+  } catch(e) {
+    body.textContent = '⚠ Error: '+e.message;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// TELEGRAM
+// ══════════════════════════════════════════════════════════════
+function getTgCreds(){return{tok:document.getElementById('tg-token').value.trim(),cid:document.getElementById('tg-chatid').value.trim()};}
+async function tgPost(text){
+  const {tok,cid}=getTgCreds();
+  if(!tok||!cid) throw new Error('Missing token or chat ID');
+  const r=await fetch(`https://api.telegram.org/bot${tok}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:cid,text,parse_mode:'HTML',disable_web_page_preview:true})});
+  const d=await r.json(); if(!d.ok) throw new Error(d.description); return d;
+}
+function tgLog(msg,cls='info'){
+  const log=document.getElementById('tg-log');
+  const ts=new Date().toLocaleTimeString();
+  log.innerHTML+=`<span style="color:${cls==='ok'?'var(--grn)':cls==='err'?'var(--red)':'var(--sub)'}">[${ts}] ${h(msg)}\n</span>`;
+  log.scrollTop=log.scrollHeight;
+}
+async function testTg(){
+  try{await tgPost('✅ <b>DEVCON OPS DASHBOARD</b>\n\nTelegram connected. Daily briefings active.');tgLog('✓ Test message sent','ok');}
+  catch(e){tgLog('✗ '+e.message,'err');}
+}
+async function findChatId(){
+  const {tok}=getTgCreds(); if(!tok){alert('Enter bot token first.');return;}
+  try{
+    const r=await fetch(`https://api.telegram.org/bot${tok}/getUpdates`);
+    const d=await r.json(); if(!d.ok) throw new Error(d.description);
+    if(!d.result.length){tgLog('No updates yet — send a message to the bot/group first','err');return;}
+    const ids=[...new Set(d.result.map(u=>{const c=u.message?.chat||u.channel_post?.chat;return c?`${c.title||c.first_name}: ${c.id}`:null}).filter(Boolean))];
+    tgLog('Found: '+ids.join(' | '),'ok');
+    if(ids.length===1){document.getElementById('tg-chatid').value=ids[0].split(': ')[1];saveTgCfg();}
+  }catch(e){tgLog('✗ '+e.message,'err');}
+}
+
+function buildDsuText(){
+  const open = tasks.critical.filter(t=>!t.done);
+  const high = tasks.high.filter(t=>!t.done);
+  const openRisks = risks.filter(r=>r.status==='open'&&r.sev==='critical');
+  const days=Math.ceil((new Date('2026-06-30')-new Date())/864e5);
+  let msg=`📝 <b>DEVCON OPS — DAILY DSU SUMMARY</b>\n${new Date().toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}\n\n`;
+  if(openRisks.length){msg+=`🚨 <b>FOR APPROVAL / CRITICAL</b>\n`;openRisks.forEach(r=>msg+=`🔴 ${r.title}\n   → ${r.action}\n`);msg+='\n';}
+  msg+=`✅ <b>OPEN TASKS (${open.length+high.length} active)</b>\n`;
+  [...open.slice(0,3),...high.slice(0,2)].forEach(t=>msg+=`• ${t.text} <i>(${t.assign})</i>\n`);
+  msg+=`\n📊 <b>KPI SNAPSHOT</b>\nCode Camps: 0/5 completed\nDays to Q2: ${days} days\nGrant: ✅ PAID ₱1,120,000\n\n`;
+  msg+=`📅 <b>DATES</b>\nMar 28 — Manila × Letran TODAY\nMar 31 — Tacloban dry run\nApr 11 — Tacloban code camp\nJun 30 — Q2 report deadline\n\n<i>DEVCON × Sui MOU · Build Beyond</i>`;
+  return msg;
+}
+
+async function sendDailySummary(){
+  tgLog('Sending daily summary...');
+  try{
+    await tgPost(buildDsuText());
+    tgLog('✓ Daily DSU summary sent','ok');
+  }catch(e){tgLog('✗ '+e.message,'err');}
+}
+
+async function sendCriticalOnly(){
+  const crits=risks.filter(r=>r.status==='open'&&r.sev==='critical');
+  if(!crits.length){tgLog('No critical risks open.','ok');return;}
+  let msg=`🚨 <b>DEVCON OPS — CRITICAL ALERTS</b>\n${crits.length} item(s)\n\n`;
+  crits.forEach(r=>msg+=`🔴 <b>${h(r.title)}</b>\n→ ${h(r.action)}\nOwner: ${h(r.owner)}\n\n`);
+  try{await tgPost(msg);tgLog(`✓ ${crits.length} critical alerts sent`,'ok');}
+  catch(e){tgLog('✗ '+e.message,'err');}
+}
+
+async function sendKpiSnapshot(){
+  const days=Math.ceil((new Date('2026-06-30')-new Date())/864e5);
+  const done=chapters.filter(c=>c.status==='done').length;
+  const msg=`📊 <b>DEVCON KPI SNAPSHOT</b>\n${new Date().toLocaleString('en-PH')}\n\n🏕 Code Camps: <b>${done}/5</b>\n📅 Q2 Deadline: <b>${days} days</b>\n💰 Grant: ✅ <b>₱1,120,000 PAID</b>\n⚠️ Open Risks: <b>${risks.filter(r=>r.status==='open').length}</b>\n📍 Next: Manila × Letran TODAY\n\n<i>DEVCON × Sui · Build Beyond</i>`;
+  try{await tgPost(msg);tgLog('✓ KPI snapshot sent','ok');}
+  catch(e){tgLog('✗ '+e.message,'err');}
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCHEDULER
+// ══════════════════════════════════════════════════════════════
+function toggleSched(){schedActive?stopSched():startSched();}
+function startSched(){
+  schedActive=true;
+  document.getElementById('sched-btn').textContent='⏹ STOP';
+  document.getElementById('sched-btn').style.color='var(--grn)';
+  schedInterval=setInterval(checkSched,60000);
+  updateSchedNext(); tgLog('Scheduler active → auto-send at '+document.getElementById('sched-time').value,'ok');
+}
+function stopSched(){
+  schedActive=false; clearInterval(schedInterval);
+  document.getElementById('sched-btn').textContent='▶ START';
+  document.getElementById('sched-btn').style.color='';
+  document.getElementById('sched-next').textContent='';
+}
+function checkSched(){
+  const [th,tm]=document.getElementById('sched-time').value.split(':').map(Number);
+  const n=new Date();
+  if(n.getHours()===th&&n.getMinutes()===tm) sendDailySummary();
+  updateSchedNext();
+}
+function updateSchedNext(){
+  if(!schedActive){document.getElementById('sched-next').textContent='';return;}
+  const [th,tm]=document.getElementById('sched-time').value.split(':').map(Number);
+  const n=new Date(),nx=new Date();
+  nx.setHours(th,tm,0,0); if(nx<=n) nx.setDate(nx.getDate()+1);
+  const diff=nx-n,hr=Math.floor(diff/3600000),mn=Math.floor((diff%3600000)/60000);
+  document.getElementById('sched-next').textContent=`in ${hr}h ${mn}m`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// PASSWORD GATE
+// ══════════════════════════════════════════════════════════════
+const PW = 'BuildBeyond2026!';
+function checkPw() {
+  const val = document.getElementById('pw-input').value;
+  if(val === PW) {
+    document.getElementById('pw-gate').style.display='none';
+    document.getElementById('app-shell').style.display='grid';
+    sessionStorage.setItem('pw_ok','1');
+  } else {
+    const box = document.querySelector('.pw-box');
+    const err = document.getElementById('pw-err');
+    err.textContent = 'Incorrect password. Try again.';
+    box.classList.remove('pw-shake');
+    void box.offsetWidth;
+    box.classList.add('pw-shake');
+    document.getElementById('pw-input').value='';
+    document.getElementById('pw-input').focus();
+  }
+}
+document.getElementById('pw-input').addEventListener('keydown', e=>{ if(e.key==='Enter') checkPw(); });
+function h(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// Clock
+setInterval(()=>{
+  const n=new Date();
+  document.getElementById('clock').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;
+},1000);
+const dn=new Date();
+document.getElementById('date-lbl').textContent=dn.toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+
+// Init
+window.addEventListener('load',()=>{
+  // Password gate
+  if(sessionStorage.getItem('pw_ok')==='1'){
+    document.getElementById('pw-gate').style.display='none';
+    document.getElementById('app-shell').style.display='grid';
+  } else {
+    document.getElementById('pw-input').focus();
+  }
+  loadTgCfg();
+  renderOverview();
+  renderTasks();
+  updateNavBadges();
+});
+</script>
+</body>
+</html>
