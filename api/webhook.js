@@ -418,11 +418,18 @@ async function kvGetParsed(key, url, token) {
     });
     const data = await r.json();
     if (!data.result) return null;
-    let parsed = typeof data.result === 'string'
-      ? JSON.parse(data.result)
-      : data.result;
-    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+
+    let parsed = data.result;
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch {}
+    }
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch {}
+    }
     if (Array.isArray(parsed)) parsed = parsed[0];
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch {}
+    }
     return parsed;
   } catch (err) {
     console.error(`kvGet error for "${key}":`, err.message);
@@ -438,7 +445,7 @@ async function kvSet(key, value, url, token) {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(value)
+      body: JSON.stringify({ value: JSON.stringify(value) })
     });
   } catch (err) {
     console.error(`kvSet error for "${key}":`, err.message);
