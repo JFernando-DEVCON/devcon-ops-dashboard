@@ -553,9 +553,25 @@ let chapters = JSON.parse(sessionStorage.getItem('chapters')||'null') || structu
 let schedActive = false, schedInterval = null;
 
 function saveState() {
-  sessionStorage.setItem('tasks', JSON.stringify(tasks));
-  sessionStorage.setItem('risks', JSON.stringify(risks));
+  sessionStorage.setItem('tasks',    JSON.stringify(tasks));
+  sessionStorage.setItem('risks',    JSON.stringify(risks));
   sessionStorage.setItem('chapters', JSON.stringify(chapters));
+  syncToServer();
+}
+
+async function syncToServer() {
+  try {
+    const r = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks, risks, chapters })
+    });
+    const d = await r.json();
+    if (d.ok) console.log('✅ Synced to server');
+    else console.warn('⚠ Sync error:', d);
+  } catch (err) {
+    console.warn('⚠ Sync failed:', err.message);
+  }
 }
 function saveTgCfg() {
   sessionStorage.setItem('tg_cid', document.getElementById('tg-chatid').value);
