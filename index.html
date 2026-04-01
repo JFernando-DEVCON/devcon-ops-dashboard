@@ -1013,16 +1013,63 @@ async function findChatId(){
 }
 
 function buildDsuText(){
-  const open = tasks.critical.filter(t=>!t.done);
-  const high = tasks.high.filter(t=>!t.done);
-  const openRisks = risks.filter(r=>r.status==='open'&&r.sev==='critical');
-  const days=Math.ceil((new Date('2026-06-30')-new Date())/864e5);
-  let msg=`📝 <b>DEVCON OPS — DAILY DSU SUMMARY</b>\n${new Date().toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}\n\n`;
-  if(openRisks.length){msg+=`🚨 <b>FOR APPROVAL / CRITICAL</b>\n`;openRisks.forEach(r=>msg+=`🔴 ${r.title}\n   → ${r.action}\n`);msg+='\n';}
-  msg+=`✅ <b>OPEN TASKS (${open.length+high.length} active)</b>\n`;
-  [...open.slice(0,3),...high.slice(0,2)].forEach(t=>msg+=`• ${t.text} <i>(${t.assign})</i>\n`);
-  msg+=`\n📊 <b>KPI SNAPSHOT</b>\nCode Camps: 0/5 completed\nDays to Q2: ${days} days\nGrant: ✅ PAID ₱1,120,000\n\n`;
-  msg+=`📅 <b>DATES</b>\nMar 28 — Manila × Letran TODAY\nMar 31 — Tacloban dry run\nApr 11 — Tacloban code camp\nJun 30 — Q2 report deadline\n\n<i>DEVCON × Sui MOU · Build Beyond</i>`;
+  const open      = tasks.critical.filter(t=>!t.done);
+  const high      = tasks.high.filter(t=>!t.done);
+  const medium    = tasks.medium.filter(t=>!t.done);
+  const openRisks = risks.filter(r=>r.status==='open' && r.sev==='critical');
+  const highRisks = risks.filter(r=>r.status==='open' && r.sev==='high');
+  const doneCamps = chapters.filter(c=>c.status==='done').length;
+  const totalActive = open.length + high.length + medium.length;
+  const days = Math.ceil((new Date('2026-06-30')-new Date())/864e5);
+
+  let msg = `📝 <b>DEVCON OPS — DAILY DSU SUMMARY</b>\n`;
+  msg += `${new Date().toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}\n\n`;
+
+  // Critical risks needing approval
+  if(openRisks.length){
+    msg += `🚨 <b>FOR APPROVAL / CRITICAL</b>\n`;
+    openRisks.forEach(r=> msg += `🔴 ${r.title}\n   → ${r.action}\n`);
+    msg += '\n';
+  }
+
+  // High risks
+  if(highRisks.length){
+    msg += `⚠️ <b>HIGH RISKS</b>\n`;
+    highRisks.slice(0,3).forEach(r=> msg += `🟠 ${r.title}\n   → ${r.action}\n`);
+    msg += '\n';
+  }
+
+  // Open tasks — all three priorities
+  msg += `✅ <b>OPEN TASKS (${totalActive} active)</b>\n`;
+  if(open.length){
+    msg += `<b>🔴 Critical:</b>\n`;
+    open.forEach(t=> msg += `• ${t.text} <i>(${t.assign})</i>\n`);
+  }
+  if(high.length){
+    msg += `<b>🟠 High:</b>\n`;
+    high.slice(0,4).forEach(t=> msg += `• ${t.text} <i>(${t.assign})</i>\n`);
+  }
+  if(medium.length){
+    msg += `<b>🟡 This Week:</b>\n`;
+    medium.slice(0,3).forEach(t=> msg += `• ${t.text} <i>(${t.assign})</i>\n`);
+  }
+  msg += '\n';
+
+  // KPI Snapshot — live from chapters
+  msg += `📊 <b>KPI SNAPSHOT</b>\n`;
+  msg += `Code Camps: <b>${doneCamps}/5</b> completed\n`;
+  msg += `Days to Q2: <b>${days} days</b>\n`;
+  msg += `Grant: ✅ PAID ₱1,120,000\n`;
+  msg += `Open Risks: <b>${risks.filter(r=>r.status==='open').length}</b>\n\n`;
+
+  // Upcoming camps — live from chapters data
+  msg += `📅 <b>UPCOMING CAMPS</b>\n`;
+  chapters
+    .filter(c=>c.status !== 'done')
+    .forEach(c=> msg += `• ${c.name} — ${c.date} (${c.status.toUpperCase()})\n`);
+  msg += '\n';
+
+  msg += `<i>DEVCON × Sui MOU · Build Beyond</i>`;
   return msg;
 }
 
