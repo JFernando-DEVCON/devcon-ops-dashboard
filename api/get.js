@@ -10,17 +10,29 @@ export default async function handler(req, res) {
     const data = await r.json();
     if (!data.result) return res.status(200).json({ data: null });
 
-    // Consistent parse — always one level of JSON.parse
+    // Parse the raw result
     let parsed = data.result;
-    if (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch {}
+
+    // Unwrap string layers
+    while (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch { break; }
     }
-    if (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch {}
-    }
+
+    // Unwrap array
     if (Array.isArray(parsed)) parsed = parsed[0];
-    if (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch {}
+
+    // Unwrap string again after array
+    while (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch { break; }
+    }
+
+    // ← KEY FIX: if still has 'value' wrapper, unwrap it
+    if (parsed && typeof parsed === 'object' && 'value' in parsed && Object.keys(parsed).length === 1) {
+      parsed = parsed.value;
+      // Parse value if it's a string
+      while (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch { break; }
+      }
     }
 
     return res.status(200).json({ data: parsed });
