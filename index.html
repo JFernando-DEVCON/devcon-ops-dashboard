@@ -579,10 +579,22 @@ function saveTgCfg() {
   sessionStorage.setItem('tg_cid', document.getElementById('tg-chatid').value);
   sessionStorage.setItem('sched_t', document.getElementById('sched-time').value);
 }
-function loadTgCfg() {
+async function loadTgCfg() {
   document.getElementById('tg-chatid').value = sessionStorage.getItem('tg_cid')||'';
   const t = sessionStorage.getItem('sched_t');
   if(t) document.getElementById('sched-time').value = t;
+
+  // Load token from server — never stored in HTML
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    if (d.botToken) {
+      document.getElementById('tg-token').value = d.botToken;
+      console.log('✅ Bot token loaded from server');
+    }
+  } catch (err) {
+    console.warn('⚠ Could not load bot token:', err.message);
+  }
 }
 
   async function loadFromServer() {
@@ -1223,16 +1235,15 @@ document.getElementById('date-lbl').textContent=dn.toLocaleDateString('en-PH',{w
 
 // Init
 window.addEventListener('load', async ()=>{
-  // Password gate
   if(sessionStorage.getItem('pw_ok')==='1'){
     document.getElementById('pw-gate').style.display='none';
     document.getElementById('app-shell').style.display='grid';
-    await loadFromServer(); // ← pulls latest from Upstash
+    await loadTgCfg();    // ← await so token loads before any Telegram action
+    await loadFromServer();
     startAutoPoll();
   } else {
     document.getElementById('pw-input').focus();
   }
-  loadTgCfg();
   renderOverview();
   renderTasks();
   updateNavBadges();
