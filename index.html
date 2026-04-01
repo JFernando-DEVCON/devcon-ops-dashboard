@@ -910,7 +910,12 @@ async function refreshAI() {
 // ══════════════════════════════════════════════════════════════
 // TELEGRAM
 // ══════════════════════════════════════════════════════════════
-function getTgCreds(){return{tok:document.getElementById('tg-token').value.trim(),cid:document.getElementById('tg-chatid').value.trim()};}
+function getTgCreds(){
+  return{
+    tok: '8775571308:AAE2JG0-p2mxKNbn67YM1GoqXpF25eF3wiI',  // ← hardcoded, never touched again
+    cid: document.getElementById('tg-chatid').value.trim()  // ← user sets this via UI
+  };
+}
 async function tgPost(text){
   const {cid}=getTgCreds();
   if(!cid) throw new Error('Missing chat ID');
