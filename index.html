@@ -509,18 +509,18 @@ const CHAPTERS = [
 // Line 1 adjusted: removes Bayleaf, retains food + JCR code camp costs only
 // Line 10 renamed: Standard Non-Profit 20% Admin Fee per sustainability model
 // Line 11 (VAT): 12% VAT compliance on ₱1,000,000 subtotal = ₱120,000
-const BUDGET_LINES = [
-  {num:1, name:'Code Camps Executions + Top 1 KPI',            alloc:200000, spent:49940,  note:'Food (McDo ₱3,600 + Jollibee ₱7,595) + JCR code camp materials partial. Bayleaf moved to Line 5.'},
-  {num:2, name:'HQ Program Head & Core Contributors',           alloc:130000, spent:39969,  note:'CA#7 intern allowances (Feb–Apr), HQARR comms, monthly rep'},
-  {num:3, name:'Campus DEVCON / SHEisDEVCON Events',           alloc:80000,  spent:43102,  note:'Iloilo seed fund ₱10,000 + SHEisDEVCON merch realloc ₱33,102 (overrun from Line 6)'},
-  {num:4, name:'Code Camp Mentor Training',                     alloc:100000, spent:10000,  note:'Michael Lance Q1 representation (15 sessions × ₱500–₱1,000)'},
-  {num:5, name:'PR & Media Launch Kickoff Event',               alloc:70000,  spent:62500,  note:'Bayleaf community dinner ₱52,500 + ₱10,000 merch partial (totes/banners for PR)'},
-  {num:6, name:'Partnership Merchandise – Top Contributors',    alloc:100000, spent:100000, note:'JCR ₱71,940 + Lazada ~₱38,922 + Arjay ₱11,000 + Lalamove ₱3,000 + Shopee umbrellas ₱8,239 — ₱33,102 overrun reallocated to Line 3'},
-  {num:7, name:'DEVCON Kids + Microbit + Hour of AI',           alloc:50000,  spent:50000,  note:'FULLY SPENT ✓ — Microbit donations, Hour of AI support, Smart AI Lens hardware. BIR invoice required.'},
-  {num:8, name:'Asset Acquisition & Marketing KPI (Laptop)',    alloc:120000, spent:69500,  note:'Nethkenn Gadgets Invoice #1586: MacBook Air M2 ₱42,000 + iPhone 13 ₱27,500'},
-  {num:9, name:'Travel for Code Camps, Representation & Fly-in Guests', alloc:50000, spent:25000, note:'Cebu Pacific roundtrip Iloilo (Lady + Marica) ~₱25,000 — Tacloban, Bukidnon, Pampanga travel + speaker fly-ins TBC'},
-  {num:10,name:'Standard Non-Profit 20% Admin Fee — Operations, Compliance & Contingency', alloc:100000, spent:10926, note:'20% sustainability admin fee: yearly thank-you lunch ₱10,925 + HQARR load. Remaining absorbs any future compliance/contingency.'},
-  {num:'VAT',name:'12% VAT Compliance (BIR — EOPT Act)',        alloc:120000, spent:0,      note:'12% VAT on ₱1,000,000 subtotal = ₱120,000 per Annex B. Tracked separately. BIR Sales/Service Invoices (not ORs) per EOPT Act.',vat:true},
+const DEFAULT_BUDGET = [
+  {id:'b1',  num:1,     name:'Code Camps Executions + Top 1 KPI',                        alloc:200000, spent:49940,  note:'Food (McDo ₱3,600 + Jollibee ₱7,595) + JCR code camp materials partial. Bayleaf moved to Line 5.'},
+  {id:'b2',  num:2,     name:'HQ Program Head & Core Contributors',                       alloc:130000, spent:39969,  note:'CA#7 intern allowances (Feb–Apr), HQARR comms, monthly rep'},
+  {id:'b3',  num:3,     name:'Campus DEVCON / SHEisDEVCON Events',                        alloc:80000,  spent:43102,  note:'Iloilo seed fund ₱10,000 + SHEisDEVCON merch realloc ₱33,102 (overrun from Line 6)'},
+  {id:'b4',  num:4,     name:'Code Camp Mentor Training',                                  alloc:100000, spent:10000,  note:'Michael Lance Q1 representation (15 sessions × ₱500–₱1,000)'},
+  {id:'b5',  num:5,     name:'PR & Media Launch Kickoff Event',                            alloc:70000,  spent:62500,  note:'Bayleaf community dinner ₱52,500 + ₱10,000 merch partial (totes/banners for PR)'},
+  {id:'b6',  num:6,     name:'Partnership Merchandise – Top Contributors',                 alloc:100000, spent:100000, note:'JCR ₱71,940 + Lazada ~₱38,922 + Arjay ₱11,000 + Lalamove ₱3,000 + Shopee umbrellas ₱8,239 — ₱33,102 overrun reallocated to Line 3'},
+  {id:'b7',  num:7,     name:'DEVCON Kids + Microbit + Hour of AI',                        alloc:50000,  spent:50000,  note:'FULLY SPENT ✓ — Microbit donations, Hour of AI support, Smart AI Lens hardware. BIR invoice required.'},
+  {id:'b8',  num:8,     name:'Asset Acquisition & Marketing KPI (Laptop)',                 alloc:120000, spent:69500,  note:'Nethkenn Gadgets Invoice #1586: MacBook Air M2 ₱42,000 + iPhone 13 ₱27,500'},
+  {id:'b9',  num:9,     name:'Travel for Code Camps, Representation & Fly-in Guests',     alloc:50000,  spent:25000,  note:'Cebu Pacific roundtrip Iloilo (Lady + Marica) ~₱25,000 — Tacloban, Bukidnon, Pampanga travel + speaker fly-ins TBC'},
+  {id:'b10', num:10,    name:'Standard Non-Profit 20% Admin Fee — Operations, Compliance & Contingency', alloc:100000, spent:10926, note:'20% sustainability admin fee: yearly thank-you lunch ₱10,925 + HQARR load. Remaining absorbs any future compliance/contingency.'},
+  {id:'bvat',num:'VAT', name:'12% VAT Compliance (BIR — EOPT Act)',                        alloc:120000, spent:0,      note:'12% VAT on ₱1,000,000 subtotal = ₱120,000 per Annex B. Tracked separately. BIR Sales/Service Invoices (not ORs) per EOPT Act.', vat:true},
 ];
 
 const CONFIRMED_PAYMENTS = [
@@ -550,15 +550,17 @@ const RISKS = [
 // ══════════════════════════════════════════════════════════════
 // STATE (session)
 // ══════════════════════════════════════════════════════════════
-let tasks = JSON.parse(sessionStorage.getItem('tasks')||'null') || structuredClone(TASKS);
-let risks = JSON.parse(sessionStorage.getItem('risks')||'null') || structuredClone(RISKS);
+let tasks    = JSON.parse(sessionStorage.getItem('tasks')||'null')    || structuredClone(TASKS);
+let risks    = JSON.parse(sessionStorage.getItem('risks')||'null')    || structuredClone(RISKS);
 let chapters = JSON.parse(sessionStorage.getItem('chapters')||'null') || structuredClone(CHAPTERS);
+let budget   = JSON.parse(sessionStorage.getItem('budget')||'null')   || structuredClone(DEFAULT_BUDGET);
 let schedActive = false, schedInterval = null;
 
 function saveState() {
   sessionStorage.setItem('tasks',    JSON.stringify(tasks));
   sessionStorage.setItem('risks',    JSON.stringify(risks));
   sessionStorage.setItem('chapters', JSON.stringify(chapters));
+  sessionStorage.setItem('budget',   JSON.stringify(budget));
   syncToServer();
 }
 
@@ -567,7 +569,7 @@ async function syncToServer() {
     const r = await fetch('/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tasks, risks, chapters })
+      body: JSON.stringify({ tasks, risks, chapters, budget })
     });
     const d = await r.json();
     if (d.ok) console.log('✅ Synced to server');
@@ -598,23 +600,26 @@ async function loadTgCfg() {
   }
 }
 
-  async function loadFromServer() {
+async function loadFromServer() {
   try {
-    const [tasksRes, risksRes, chaptersRes] = await Promise.all([
+    const [tasksRes, risksRes, chaptersRes, budgetRes] = await Promise.all([
       fetch('/api/get?key=tasks'),
       fetch('/api/get?key=risks'),
       fetch('/api/get?key=chapters'),
+      fetch('/api/get?key=budget'),
     ]);
-    const [t, r, c] = await Promise.all([
-      tasksRes.json(), risksRes.json(), chaptersRes.json()
+    const [t, r, c, b] = await Promise.all([
+      tasksRes.json(), risksRes.json(), chaptersRes.json(), budgetRes.json()
     ]);
     if (t.data) tasks    = t.data;
     if (r.data) risks    = r.data;
     if (c.data) chapters = c.data;
+    if (b.data) budget   = b.data;
     renderOverview();
     renderTasks();
     renderChapters();
     renderRisks();
+    renderBudget();
     console.log('✅ Loaded fresh data from server');
   } catch (err) {
     console.warn('⚠ Could not load from server, using local data:', err.message);
@@ -888,28 +893,48 @@ function markCampDone(chId) {
 // ══════════════════════════════════════════════════════════════
 function renderBudget() {
   let totalSpent=0, overruns=0;
-  const opLines = BUDGET_LINES.filter(l=>!l.vat);
-  const vatLine = BUDGET_LINES.find(l=>l.vat);
+  const opLines = budget.filter(l=>!l.vat);
+  const vatLine = budget.find(l=>l.vat);
 
-  const rows = opLines.map(l=>{
-    const rem = l.alloc - l.spent;
-    const pct = Math.min(Math.round(l.spent/l.alloc*100),120);
-    const over = l.spent > l.alloc;
-    if(over) overruns++;
-    totalSpent += l.spent;
-    const barCls = over?'over':pct>80?'warn':'ok';
-    const remCls = over?'c-red':pct>80?'c-org':'c-grn';
-    // Special styling for Line 10 (admin fee) and VAT
-    const isAdmin = String(l.num)==='10';
-    return `<tr style="${isAdmin?'background:rgba(240,165,53,.04)':''}">
-      <td style="font-family:var(--mono);font-size:10px;color:var(--dim)">${l.num}</td>
-      <td><div class="bline" style="${isAdmin?'color:var(--acc)':''}">${l.name}</div><div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${l.note}</div></td>
-      <td class="bamt">₱${l.alloc.toLocaleString()}</td>
-      <td class="bamt ${over?'over':pct>80?'warn':'ok'}">₱${l.spent.toLocaleString()}${over?' ⚠':''}</td>
-      <td class="bamt ${remCls}">₱${Math.abs(rem).toLocaleString()}${over?' OVER':''}</td>
-      <td><div class="bbar"><div class="bfill ${barCls}" style="width:${Math.min(pct,100)}%"></div></div><div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${pct}%${over?' (OVER)':''}</div></td>
-    </tr>`;
-  }).join('');
+function editSpent(budgetId) {
+  const line = budget.find(b => b.id === budgetId);
+  if (!line) return;
+  const newVal = prompt(`Update spent for Line ${line.num} — ${line.name}\nCurrent: ₱${line.spent.toLocaleString()}\n\nEnter new amount:`, line.spent);
+  if (newVal === null) return; // cancelled
+  const parsed = parseInt(newVal.replace(/[₱,]/g, ''));
+  if (isNaN(parsed) || parsed < 0) { alert('Invalid amount. Enter a number like 50000'); return; }
+  line.spent = parsed;
+  saveState();
+  renderBudget();
+}
+
+const rows = opLines.map(l=>{
+  const rem = l.alloc - l.spent;
+  const pct = Math.min(Math.round(l.spent/l.alloc*100),120);
+  const over = l.spent > l.alloc;
+  if(over) overruns++;
+  totalSpent += l.spent;
+  const barCls = over?'over':pct>80?'warn':'ok';
+  const remCls = over?'c-red':pct>80?'c-org':'c-grn';
+  const isAdmin = String(l.num)==='10';
+  return `<tr style="${isAdmin?'background:rgba(240,165,53,.04)':''}">
+    <td style="font-family:var(--mono);font-size:10px;color:var(--dim)">${l.num}</td>
+    <td>
+      <div class="bline" style="${isAdmin?'color:var(--acc)':''}">${l.name}</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${l.note}</div>
+    </td>
+    <td class="bamt">₱${l.alloc.toLocaleString()}</td>
+    <td class="bamt ${over?'over':pct>80?'warn':'ok'}">
+      ₱${l.spent.toLocaleString()}${over?' ⚠':''}
+      <button onclick="editSpent('${l.id}')" style="margin-left:6px;background:transparent;border:1px solid var(--bdr);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:8px;color:var(--dim);cursor:pointer" title="Edit spent amount">✏️</button>
+    </td>
+    <td class="bamt ${remCls}">₱${Math.abs(rem).toLocaleString()}${over?' OVER':''}</td>
+    <td>
+      <div class="bbar"><div class="bfill ${barCls}" style="width:${Math.min(pct,100)}%"></div></div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${pct}%${over?' (OVER)':''}</div>
+    </td>
+  </tr>`;
+}).join('');
 
   // Subtotal row
   const subtotalRow = `
