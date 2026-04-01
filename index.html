@@ -47,7 +47,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
 /* ── Page header ── */
 .pg-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--bdr)}
-.pg-title{font-family:var(--hdg);font-size:22px;font-weight:800;color:var(--txt)}
+.pg-title{font-family:var(--hdg);font-size:22px;font-weight:800;color:var(--txt);line-height:1.2}
 .pg-sub{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:3px;letter-spacing:.5px}
 
 /* ── Stat cards ── */
@@ -187,10 +187,101 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
 /* ── Responsive ── */
 @media(max-width:700px){
+  /* Layout */
   .app{grid-template-columns:1fr}
-  .sidebar{position:relative;height:auto;flex-direction:row;flex-wrap:wrap;padding:12px}
-  .chapter-grid{grid-template-columns:1fr}
-  .stat-row{grid-template-columns:1fr 1fr}
+  .main{min-height:auto}
+  .page{padding:16px 14px 40px}
+
+  /* Sidebar becomes top bar */
+  .sidebar{
+    position:relative;
+    height:auto;
+    flex-direction:column;
+    padding:12px 14px;
+    border-right:none;
+    border-bottom:1px solid var(--bdr);
+  }
+  .sidebar-footer{
+    margin-top:12px;
+    padding:12px 0 0;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .clock-box{font-size:11px}
+  .clock-val{font-size:13px}
+
+  /* Nav items horizontal scroll */
+  .nav-section{padding:0;margin-bottom:4px}
+  .nav-section:first-of-type{
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px;
+  }
+  .nav-item{
+    padding:6px 10px;
+    font-size:12px;
+    flex:0 0 auto;
+  }
+
+  /* Page title smaller on mobile */
+  .pg-title{font-size:16px !important;line-height:1.3}
+  .pg-sub{font-size:9px}
+  .pg-header{
+    flex-direction:column;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .pg-header > div:last-child{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+
+  /* Stat cards — 2 columns */
+  .stat-row{grid-template-columns:1fr 1fr;gap:8px}
+  .stat{padding:10px 12px}
+  .stat-val{font-size:18px}
+
+  /* Cards */
+  .card{margin-bottom:10px}
+
+  /* Tasks */
+  .task-row{
+    grid-template-columns:24px auto 1fr auto;
+    gap:6px;
+    padding:10px 12px;
+    flex-wrap:wrap;
+  }
+  .task-assign{display:none}
+  .task-due{display:none}
+  .task-prio{display:none}
+
+  /* Budget table — scrollable */
+  .budget-table{font-size:11px}
+  #budget-table{overflow-x:auto;display:block}
+
+  /* Chapter grid */
+  .chapter-grid{grid-template-columns:1fr;padding:10px}
+
+  /* Risk rows */
+  .risk-row{
+    grid-template-columns:8px 1fr auto;
+    gap:8px;
+    padding:10px 12px;
+  }
+  .risk-owner{display:none}
+
+  /* Buttons smaller */
+  .btn{padding:6px 10px;font-size:9px}
+  .btn-sm{padding:4px 8px;font-size:8px}
+
+  /* Hide sidebar footer clock on very small screens */
+  @media(max-width:400px){
+    .clock-box{display:none}
+  }
 }
 
 /* ── Password Gate ── */
