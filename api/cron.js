@@ -137,12 +137,19 @@ async function kvGet(key, url, token) {
     });
     const data = await r.json();
     if (!data.result) return null;
-    // Upstash sometimes double-encodes — handle both cases
-    const parsed = typeof data.result === 'string'
+
+    // Parse the result
+    let parsed = typeof data.result === 'string'
       ? JSON.parse(data.result)
       : data.result;
-    // If still a string (double encoded), parse again
-    return typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+
+    // If double encoded, parse again
+    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+
+    // If wrapped in array (Upstash quirk), unwrap it
+    if (Array.isArray(parsed)) parsed = parsed[0];
+
+    return parsed;
   } catch (err) {
     console.error(`kvGet error for key "${key}":`, err.message);
     return null;
