@@ -380,16 +380,13 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
   <div class="card">
     <div class="card-head"><span class="card-title">⚙️ BOT CONFIGURATION</span></div>
-    <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">BOT TOKEN</div>
-        <input class="tg-mini-input" id="tg-token" type="password" placeholder="123456:ABC-DEFxxx..." style="width:100%" oninput="saveTgCfg()">
-      </div>
-      <div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">CHAT ID / @USERNAME</div>
-        <input class="tg-mini-input" id="tg-chatid" type="text" placeholder="-100123456789 or @channel" style="width:100%" oninput="saveTgCfg()">
-      </div>
-    </div>
+    <div style="padding:16px">
+  <input type="hidden" id="tg-token" value="8775571308:AAE2JG0-p2mxKNbn67YM1GoqXpF25eF3wiI">
+  <div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">CHAT ID / @USERNAME</div>
+    <input class="tg-mini-input" id="tg-chatid" type="text" placeholder="-100123456789 or @channel" style="width:100%" oninput="saveTgCfg()">
+  </div>
+</div>
     <div style="padding:0 16px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-blu" onclick="testTg()">📡 TEST</button>
       <button class="btn btn-ghost" onclick="findChatId()">🔍 FIND CHAT ID</button>
@@ -490,7 +487,7 @@ const CHAPTERS = [
    ]},
 ];
 
-// BUDGET REALLOCATION NOTES (Mar 28 2026):
+// BUDGET REALLOCATION NOTES (Mar 28 2026):saveTgCfg()
 // Line 6 merch overrun ₱33,102 → reallocated to Line 3 (SHEisDEVCON merch)
 // Bayleaf ₱52,500 + ₱10,000 merch partial → moved to Line 5 (PR & Media Launch)
 // Line 1 adjusted: removes Bayleaf, retains food + JCR code camp costs only
@@ -548,12 +545,10 @@ function saveState() {
   sessionStorage.setItem('chapters', JSON.stringify(chapters));
 }
 function saveTgCfg() {
-  sessionStorage.setItem('tg_tok', document.getElementById('tg-token').value);
   sessionStorage.setItem('tg_cid', document.getElementById('tg-chatid').value);
   sessionStorage.setItem('sched_t', document.getElementById('sched-time').value);
 }
 function loadTgCfg() {
-  document.getElementById('tg-token').value = sessionStorage.getItem('tg_tok')||'';
   document.getElementById('tg-chatid').value = sessionStorage.getItem('tg_cid')||'';
   const t = sessionStorage.getItem('sched_t');
   if(t) document.getElementById('sched-time').value = t;
