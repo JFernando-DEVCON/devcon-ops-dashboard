@@ -65,7 +65,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .card-body{padding:0}
 
 /* ── Task list ── */
-.task-row{display:grid;grid-template-columns:28px 1fr auto auto auto auto;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--bdr);transition:background .1s}
+.task-row{display:grid;grid-template-columns:28px auto 1fr auto auto auto auto;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--bdr);transition:background .1s}
 .task-row:last-child{border-bottom:none}
 .task-row:hover{background:rgba(255,255,255,.02)}
 .task-check{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--bdr);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
@@ -78,6 +78,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .task-due.overdue{color:var(--red)}
 .task-prio{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .task-prio.critical{background:var(--red)}.task-prio.high{background:var(--org)}.task-prio.medium{background:var(--acc)}.task-prio.low{background:var(--grn)}
+.task-id-badge{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s3);border:1px solid var(--bdr);border-radius:4px;padding:2px 6px;white-space:nowrap;letter-spacing:.5px}
 
 /* Add task row */
 .add-task-row{padding:10px 16px;border-top:1px solid var(--bdr);display:flex;gap:8px;background:var(--s2)}
@@ -710,16 +711,17 @@ function renderTasks() {
     const done   = items.filter(t=>t.done);
 
     // Render a single task row
-    function taskRow(t, i, isDone) {
-      return `<div class="task-row" id="tr-${t.id}" style="${isDone?'opacity:.5':''}">
-        <div class="task-check ${isDone?'done':''}" onclick="toggleTask('${prio}',${i})"></div>
-        <div class="task-text ${isDone?'done':''}">${h(t.text)}</div>
-        <span class="task-assign">${h(t.assign||'—')}</span>
-        <span class="task-due ${isDue(t.due)?'overdue':''}">${t.due||''}</span>
-        <div class="task-prio ${prio}"></div>
-        <button class="task-del" onclick="deleteTask('${prio}',${i})" title="Delete task">✕</button>
-      </div>`;
-    }
+function taskRow(t, i, isDone) {
+  return `<div class="task-row" id="tr-${t.id}" style="${isDone?'opacity:.5':''}">
+    <div class="task-check ${isDone?'done':''}" onclick="toggleTask('${prio}',${i})"></div>
+    <span class="task-id-badge">${h(t.id)}</span>
+    <div class="task-text ${isDone?'done':''}">${h(t.text)}</div>
+    <span class="task-assign">${h(t.assign||'—')}</span>
+    <span class="task-due ${isDue(t.due)?'overdue':''}">${t.due||''}</span>
+    <div class="task-prio ${prio}"></div>
+    <button class="task-del" onclick="deleteTask('${prio}',${i})" title="Delete task">✕</button>
+  </div>`;
+}
 
     // Build active rows
     let html = active.map((t)=>{
