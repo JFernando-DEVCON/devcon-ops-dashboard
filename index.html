@@ -65,7 +65,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .card-body{padding:0}
 
 /* ── Task list ── */
-.task-row{display:grid;grid-template-columns:28px 1fr auto auto auto;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--bdr);transition:background .1s}
+.task-row{display:grid;grid-template-columns:28px 1fr auto auto auto auto;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--bdr);transition:background .1s}
 .task-row:last-child{border-bottom:none}
 .task-row:hover{background:rgba(255,255,255,.02)}
 .task-check{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--bdr);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
@@ -86,7 +86,20 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .add-input::placeholder{color:var(--dim)}
 .add-btn{background:var(--acc);border:none;border-radius:6px;padding:7px 14px;font-family:var(--mono);font-size:10px;color:#0a0b0d;font-weight:600;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;transition:filter .15s}
 .add-btn:hover{filter:brightness(1.1)}
+  
+/* ── Done section ── */
+.done-section{border-top:1px solid var(--bdr);margin-top:4px}
+.done-section-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);padding:8px 16px 4px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.done-section-label:hover{color:var(--sub)}
+.done-section-label::before{content:'▸';font-size:9px;transition:transform .2s;display:inline-block}
+.done-section-label.open::before{transform:rotate(90deg)}
+.done-items{display:none}
+.done-items.open{display:block}
 
+/* ── Delete button ── */
+.task-del{background:transparent;border:none;color:var(--dim);font-size:12px;cursor:pointer;padding:2px 4px;border-radius:3px;opacity:0;transition:all .15s;line-height:1}
+.task-row:hover .task-del{opacity:1}
+.task-del:hover{color:var(--red);background:rgba(244,71,71,.1)}
 /* ── Chapter tracker ── */
 .chapter-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px}
 .ch-card{background:var(--s2);border:1px solid var(--bdr);border-radius:9px;padding:14px;cursor:pointer;transition:border-color .2s}
@@ -620,16 +633,57 @@ function renderTasks() {
   ['critical','high','medium'].forEach(prio=>{
     const list = document.getElementById('tasks-'+prio);
     const items = tasks[prio];
-    list.innerHTML = items.map((t,i)=>`
-      <div class="task-row" id="tr-${t.id}">
-        <div class="task-check ${t.done?'done':''}" onclick="toggleTask('${prio}',${i})"></div>
-        <div class="task-text ${t.done?'done':''}">${h(t.text)}</div>
+
+    // Separate active and done
+    const active = items.filter(t=>!t.done);
+    const done   = items.filter(t=>t.done);
+
+    // Render a single task row
+    function taskRow(t, i, isDone) {
+      return `<div class="task-row" id="tr-${t.id}" style="${isDone?'opacity:.5':''}">
+        <div class="task-check ${isDone?'done':''}" onclick="toggleTask('${prio}',${i})"></div>
+        <div class="task-text ${isDone?'done':''}">${h(t.text)}</div>
         <span class="task-assign">${h(t.assign||'—')}</span>
         <span class="task-due ${isDue(t.due)?'overdue':''}">${t.due||''}</span>
         <div class="task-prio ${prio}"></div>
-      </div>`).join('');
-    const done = items.filter(t=>t.done).length;
-    document.getElementById('tasks-'+prio.replace('medium','med')+'-prog').textContent = `${done}/${items.length}`;
+        <button class="task-del" onclick="deleteTask('${prio}',${i})" title="Delete task">✕</button>
+      </div>`;
+    }
+
+    // Build active rows
+    let html = active.map((t)=>{
+      const realIdx = items.indexOf(t);
+      return taskRow(t, realIdx, false);
+    }).join('');
+
+    // Build done section — only show for 'medium' (This Week) as collapsible
+    // For critical and high, show inline collapsed by default
+    if(done.length > 0) {
+      const sectionId = 'done-items-'+prio;
+      const labelId   = 'done-label-'+prio;
+      // medium starts open, others start closed
+      const startOpen = prio === 'medium';
+      html += `
+        <div class="done-section">
+          <div class="done-section-label ${startOpen?'open':''}" id="${labelId}"
+               onclick="toggleDoneSection('${prio}')">
+            DONE (${done.length})
+          </div>
+          <div class="done-items ${startOpen?'open':''}" id="${sectionId}">
+            ${done.map((t)=>{
+              const realIdx = items.indexOf(t);
+              return taskRow(t, realIdx, true);
+            }).join('')}
+          </div>
+        </div>`;
+    }
+
+    list.innerHTML = html;
+
+    // Fix progress pill ID (critical→crit, medium→med)
+    const progId = 'tasks-' + prio.replace('critical','crit').replace('medium','med') + '-prog';
+    const progEl = document.getElementById(progId);
+    if(progEl) progEl.textContent = `${done.length}/${items.length}`;
   });
   updateNavBadges();
 }
@@ -648,6 +702,20 @@ function addTask(prio, input) {
   saveState(); renderTasks();
 }
 
+function toggleDoneSection(prio) {
+  const label = document.getElementById('done-label-'+prio);
+  const items = document.getElementById('done-items-'+prio);
+  if(!label || !items) return;
+  label.classList.toggle('open');
+  items.classList.toggle('open');
+}
+
+function deleteTask(prio, idx) {
+  if(!confirm('Delete this task?')) return;
+  tasks[prio].splice(idx, 1);
+  saveState(); renderTasks();
+}
+  
 function clearDone(section) {
   ['critical','high','medium'].forEach(p=>{ tasks[p]=tasks[p].filter(t=>!t.done); });
   saveState(); renderTasks();
