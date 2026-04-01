@@ -1046,8 +1046,8 @@ async function refreshAI() {
 // ══════════════════════════════════════════════════════════════
 function getTgCreds(){
   return{
-    tok: '8775571308:AAE2JG0-p2mxKNbn67YM1GoqXpF25eF3wiI',  // ← hardcoded, never touched again
-    cid: document.getElementById('tg-chatid').value.trim()  // ← user sets this via UI
+    tok: document.getElementById('tg-token').value.trim(),
+    cid: document.getElementById('tg-chatid').value.trim()
   };
 }
 async function tgPost(text){
