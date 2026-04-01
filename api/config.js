@@ -1,6 +1,16 @@
 export default async function handler(req, res) {
-  // Only allow GET
   if (req.method !== 'GET') return res.status(405).end();
+
+  // Only allow requests from your own dashboard
+  const referer = req.headers['referer'] || '';
+  const origin  = req.headers['origin'] || '';
+  const isFromDashboard = 
+    referer.includes('devcon-ops-dashboard.vercel.app') ||
+    origin.includes('devcon-ops-dashboard.vercel.app');
+
+  if (!isFromDashboard) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   return res.status(200).json({
     botToken: process.env.TELEGRAM_BOT_TOKEN
