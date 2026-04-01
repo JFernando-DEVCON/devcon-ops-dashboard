@@ -120,6 +120,8 @@ if (command === '/help') {
   reply += `/budget — view all budget line items\n`;
   reply += `/updatespent [id] [amount] — update spent amount\n`;
   reply += `  example: <code>/updatespent b1 55000</code>\n\n`;
+  reply += `/update [description] — natural language budget update\n`;
+  reply += `  example: <code>/update Bought Marica flight ₱8,500 for Iloilo ABA</code>\n\n`;
 
   reply += `<b>⚠️ Risk Commands:</b>\n`;
   reply += `/risks — list all open risks with IDs\n`;
@@ -450,6 +452,103 @@ const newTask = {
   }
 }
 
+  else if (command === '/update') {
+  const query = args.join(' ');
+  if (!query) {
+    reply = '⚠️ Usage: <code>/update [describe what was spent]</code>\n\n';
+    reply += 'Example:\n<code>/update Bought Marica Iloilo flight ₱8,500 for ABA. Charge to Line 9 Travel.</code>';
+  } else {
+    const budget = await kvGetParsed('budget', KV_URL, KV_TOKEN);
+    if (!budget) {
+      reply = '⚠️ No budget data found. Open dashboard first.';
+    } else {
+      // Build budget context for Claude
+      const budgetContext = budget
+        .filter(b => !b.vat)
+        .map(b => `${b.id} | Line ${b.num} | ${b.name} | Allocated: ₱${b.alloc.toLocaleString()} | Spent: ₱${b.spent.toLocaleString()} | Remaining: ₱${(b.alloc - b.spent).toLocaleString()}`)
+        .join('\n');
+
+      const anthropic = new Anthropic({ apiKey: CLAUDE_KEY });
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: `You are a budget assistant for DEVCON Philippines ops. 
+        
+Given a natural language expense update, you must:
+1. Identify which budget line(s) to update
+2. Extract the peso amount(s)
+3. Return ONLY a valid JSON array of updates, nothing else
+
+Budget lines available:
+${budgetContext}
+
+Rules:
+- If amount is a range (e.g. 30-40k), use the midpoint (35000)
+- If amount is estimated, flag it
+- Match expenses to the most relevant budget line
+- Return JSON only, no explanation
+
+Format:
+[{"id":"b1","addAmount":5000,"note":"description of expense"}]
+
+If you cannot determine the amount or line, return:
+[{"error":"explanation of what info is missing"}]`,
+        messages: [{ role: 'user', content: query }]
+      });
+
+      const rawText = response.content[0].text.trim();
+
+      try {
+        // Parse Claude's JSON response
+        const updates = JSON.parse(rawText);
+
+        if (updates[0]?.error) {
+          reply = `⚠️ <b>Couldn't process update:</b>\n${updates[0].error}\n\n`;
+          reply += `Please be more specific about:\n• The peso amount\n• What it was spent on\n\n`;
+          reply += `Or use: <code>/updatespent [line-id] [total-amount]</code>`;
+        } else {
+          // Apply updates
+          let updateLog = `📝 <b>BUDGET UPDATE APPLIED</b>\n\n`;
+          let hasError = false;
+
+          for (const update of updates) {
+            const line = budget.find(b => b.id === update.id);
+            if (!line) {
+              updateLog += `⚠️ Line ${update.id} not found\n`;
+              hasError = true;
+              continue;
+            }
+            const oldSpent = line.spent;
+            line.spent = oldSpent + update.addAmount;
+            const newPct = Math.round(line.spent / line.alloc * 100);
+            const status = line.spent > line.alloc ? '🔴 OVER' : newPct > 80 ? '🟠 HIGH' : '🟢 OK';
+
+            updateLog += `${status} <b>Line ${line.num} — ${line.name}</b>\n`;
+            updateLog += `  Added: +₱${update.addAmount.toLocaleString()}\n`;
+            updateLog += `  Note: ${update.note}\n`;
+            updateLog += `  New spent: ₱${line.spent.toLocaleString()} / ₱${line.alloc.toLocaleString()} (${newPct}%)\n\n`;
+          }
+
+          if (!hasError) {
+            await kvSet('budget', budget, KV_URL, KV_TOKEN);
+            updateLog += `✅ <b>Saved to dashboard.</b>\n`;
+            updateLog += `<i>Refresh dashboard to see changes.</i>`;
+          } else {
+            updateLog += `⚠️ Some updates failed. Budget not saved.`;
+          }
+
+          reply = updateLog;
+        }
+      } catch (parseErr) {
+        // Claude didn't return clean JSON — fall back to asking for clarification
+        reply = `🤖 <b>I understood your update but need clarification:</b>\n\n`;
+        reply += `${rawText}\n\n`;
+        reply += `Please confirm with:\n<code>/updatespent [line-id] [new-total-amount]</code>\n\n`;
+        reply += `Or retry with exact amounts:\n<code>/update Marica Iloilo flight ₱8,500 charge to Travel line</code>`;
+      }
+    }
+  }
+}
     // ─────────────────────────────────────────
     // /ask — AI assistant
     // ─────────────────────────────────────────
