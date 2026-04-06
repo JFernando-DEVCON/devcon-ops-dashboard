@@ -233,56 +233,88 @@ if (command === '/help') {
     // /addtask [priority] [text] @[assignee]
     // ─────────────────────────────────────────
 else if (command === '/addtask') {
-  const priority = args[0]?.toLowerCase();
-  if (!['critical', 'high', 'medium'].includes(priority)) {
-    reply = '⚠️ Usage: <code>/addtask [critical|high|medium] [task text] @[assignee]</code>\nExample: <code>/addtask high Follow up Rolf on Tacloban @Rolf</code>';
+  const query = args.join(' ').trim();
+
+  if (!query) {
+    reply = '⚠️ Usage: <code>/addtask [describe the task naturally]</code>\n\n';
+    reply += 'Examples:\n';
+    reply += '• <code>/addtask Follow up Rolf on Tacloban date, high priority</code>\n';
+    reply += '• <code>/addtask Submit BIR invoices assign to Jedd, critical</code>\n';
+    reply += '• <code>/addtask Draft Q2 report outline for Dom, this week</code>\n';
+    reply += '• <code>/addtask paalamin si Zhi sa Bukidnon ocular, high</code>';
   } else {
-    const remaining = args.slice(1).join(' ');
-    const assignMatch = remaining.match(/@(\w+)/);
-    const assign = assignMatch ? assignMatch[1] : 'Unassigned';
-    const taskText = remaining.replace(/@\w+/, '').trim();
-
-    if (!taskText) {
-      reply = '⚠️ Please include a task description.';
+    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+    if (!tasks) {
+      reply = '⚠️ No dashboard data found. Open the dashboard first.';
     } else {
-      let tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+      // Build existing task IDs to generate next sequential ID
+      const allTasks = [...tasks.critical, ...tasks.high, ...tasks.medium];
+      const existingNums = allTasks
+        .map(t => parseInt(t.id.replace('t', '')))
+        .filter(n => !isNaN(n) && n < 1000000);
+      const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 16;
+      const newId = 't' + nextNum;
 
-      // Debug log
-      console.log('tasks type:', typeof tasks);
-      console.log('tasks full value:', JSON.stringify(tasks)?.slice(0, 500));
-      console.log('tasks keys:', tasks ? Object.keys(tasks) : 'null');
-      console.log('tasks.high type:', typeof tasks?.high);
-      console.log('tasks.high value:', JSON.stringify(tasks?.high)?.slice(0, 200));
+      // Use Claude to parse natural language
+      const anthropic = new Anthropic({ apiKey: CLAUDE_KEY });
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        system: `You extract task details from natural language for a Filipino ops team dashboard.
+Extract and return ONLY valid JSON, nothing else, no markdown, no explanation.
 
-      if (!tasks) {
-        reply = '⚠️ No dashboard data found. Open the dashboard first.';
-      } else if (!tasks[priority]) {
-        // Structure exists but priority array missing — initialize it
-        tasks[priority] = [];
-        reply = `⚠️ Priority array was missing, initialized. Try again.`;
-      } else {
-const allTasks = [
-  ...tasks.critical,
-  ...tasks.high,
-  ...tasks.medium
-];
-const existingNums = allTasks
-  .map(t => parseInt(t.id.replace('t', '')))
-  .filter(n => !isNaN(n) && n < 1000000); // ignore timestamp IDs
-const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
-const newId = 't' + nextNum;
+Team members: Jedd, Dom, Lady, Rolf, Marica, Ted, Zhi, Joash, Jianyi
 
-const newTask = {
-  id: newId,
-  text: taskText,
-  assign,
-  due: '',
-  done: false
-};
+Return this exact format:
+{"text":"clean task description","priority":"critical|high|medium","assign":"TeamMemberName","due":""}
+
+Rules:
+- priority: "critical" if urgent/ASAP/critical/agad, "high" if high/important/priority, "medium" if this week/medium/normal/default
+- assign: match to closest team member name mentioned, default to "Jedd" if none mentioned
+- text: clean, professional task description in English (translate if Filipino)
+- due: leave empty string always
+- Never include quotes inside the text value`,
+        messages: [{ role: 'user', content: query }]
+      });
+
+      const raw = response.content[0].text.trim();
+
+      try {
+        const parsed = JSON.parse(raw);
+
+        if (!parsed.text || !parsed.priority || !parsed.assign) {
+          throw new Error('Incomplete parse');
+        }
+
+        // Validate priority
+        const priority = ['critical','high','medium'].includes(parsed.priority)
+          ? parsed.priority
+          : 'medium';
+
+        const newTask = {
+          id: newId,
+          text: parsed.text,
+          assign: parsed.assign,
+          due: parsed.due || '',
+          done: false
+        };
+
         tasks[priority].push(newTask);
         await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+
         const prioIcon = priority === 'critical' ? '🔴' : priority === 'high' ? '🟠' : '🟡';
-        reply = `${prioIcon} <b>Task added to ${priority}:</b>\n${taskText}\n👤 Assigned to: ${assign}\n🆔 ID: <code>${newTask.id}</code>\n\n<i>Refresh dashboard to see changes.</i>`;
+        reply = `${prioIcon} <b>Task added!</b>\n\n`;
+        reply += `📋 ${newTask.text}\n`;
+        reply += `👤 Assigned to: <b>${newTask.assign}</b>\n`;
+        reply += `📊 Priority: <b>${priority.toUpperCase()}</b>\n`;
+        reply += `🆔 ID: <code>${newId}</code>\n\n`;
+        reply += `<i>Refresh dashboard to see changes.</i>`;
+
+      } catch (err) {
+        // Claude didn't return clean JSON — ask for retry
+        reply = `⚠️ Couldn't parse that task. Try being more specific:\n\n`;
+        reply += `<code>/addtask [task description] [priority] @[assignee]</code>\n\n`;
+        reply += `Example: <code>/addtask Follow up Rolf on Tacloban date, high priority</code>`;
       }
     }
   }
