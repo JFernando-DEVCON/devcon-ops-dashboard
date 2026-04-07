@@ -50,7 +50,10 @@ async function kvSet(key, value, url, token) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: JSON.stringify(value) })
   });
-  return r.json();
+  const result = await r.json();
+  console.log(`kvSet [${key}] status:`, r.status, JSON.stringify(result));
+  if (!r.ok) throw new Error(`KV write failed for key "${key}": ${JSON.stringify(result)}`);
+  return result;
 }
 
 async function kvGetParsed(key, url, token) {
@@ -727,166 +730,152 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
     // ════════════════════════════════════════
     // /help
     // ════════════════════════════════════════
-  else if (command === '/help') {
-  reply  = `📖 <b>DEVCON OPS BOT — COMMANDS</b>\n\n`;
+  // ════════════════════════════════════════
+    // /setdue [id] [date]
+    // ════════════════════════════════════════
+    else if (command === '/setdue') {
+      const id        = args[0];
+      const dateParts = args.slice(1).join(' ').trim();
 
-  reply += `<b>── TASKS ──</b>\n`;
-  reply += `/tasks — list all open tasks by priority\n`;
-  reply += `/done [id] — mark done · <code>/done t1</code>\n`;
-  reply += `/undone [id] — reopen · <code>/undone t1</code>\n`;
-  reply += `/addtask [natural language] — add task (always include who)\n`;
-  reply += `  <code>/addtask Rolf to confirm Tacloban date, high</code>\n`;
-  reply += `/deltask [id] — delete · <code>/deltask t5</code>\n`;
-  reply += `/setdue [id] [date] — update deadline · <code>/setdue t1 Apr 21</code>\n`;
-  reply += `  <i>Auto-restores from backlog if new date not overdue</i>\n`;
-  reply += `/reassign [id] [name] — change assignee · <code>/reassign t5 Rolf</code>\n\n`;
-
-  reply += `<b>── FILTER ──</b>\n`;
-  reply += `/mytasks [name or group]\n`;
-  reply += `  person: <code>/mytasks Jedd</code> · <code>/mytasks Rolf</code>\n`;
-  reply += `  group: <code>/mytasks hq</code> · <code>/mytasks chapters</code> · <code>/mytasks interns</code>\n`;
-  reply += `  chapter: <code>/mytasks Tacloban</code> · <code>/mytasks Cebu</code>\n`;
-  reply += `  cohort: <code>/mytasks cohort 3</code> · <code>/mytasks cohort 4</code>\n\n`;
-
-  reply += `<b>── RISKS ──</b>\n`;
-  reply += `/risks — list open risks\n`;
-  reply += `/resolve [id] — toggle resolved · <code>/resolve r4</code>\n\n`;
-
-  reply += `<b>── BUDGET ──</b>\n`;
-  reply += `/budget — view all line items\n`;
-  reply += `/updatespent [id] [amount] · <code>/updatespent b1 50000</code>\n`;
-  reply += `/update [natural language] · <code>/update line 5 is now 62500</code>\n\n`;
-
-  reply += `<b>── INFO ──</b>\n`;
-  reply += `/status — quick ops summary\n`;
-  reply += `/ping — bot online check\n`;
-  reply += `/ask [question] — AI assistant\n`;
-  reply += `reply to bot message — AI follow-up\n\n`;
-
-  reply += `<b>── TEAM ──</b>\n`;
-  reply += teamListStr();
-}
-      // ════════════════════════════════════════
-// /setdue [id] [date]
-// ════════════════════════════════════════
-else if (command === '/setdue') {
-  const id        = args[0];
-  const dateParts = args.slice(1).join(' ').trim();
-
-  if (!id || !dateParts) {
-    reply  = '⚠️ Usage: <code>/setdue [task-id] [new due date]</code>\n\n';
-    reply += 'Examples:\n';
-    reply += '• <code>/setdue t1 Apr 21</code>\n';
-    reply += '• <code>/setdue t4 May 15</code>\n';
-    reply += '• <code>/setdue t9 Jun 1</code>\n\n';
-    reply += '<i>If task is in backlog and new date is not overdue, it auto-restores to original priority.</i>';
-  } else {
-    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
-    if (!tasks) { reply = '⚠️ No dashboard data found.'; }
-    else {
-      if (!tasks.backlog) tasks.backlog = [];
-      let foundTask = null;
-      let foundPrio = null;
-
-      for (const prio of ['critical', 'high', 'medium', 'backlog']) {
-        const t = (tasks[prio] || []).find(t => t.id === id);
-        if (t) { foundTask = t; foundPrio = prio; break; }
-      }
-
-      if (!foundTask) {
-        reply = `⚠️ Task <code>${id}</code> not found.`;
+      if (!id || !dateParts) {
+        reply  = '⚠️ Usage: <code>/setdue [task-id] [new due date]</code>\n\n';
+        reply += 'Examples:\n';
+        reply += '• <code>/setdue t1 Apr 21</code>\n';
+        reply += '• <code>/setdue t4 May 15</code>\n';
+        reply += '• <code>/setdue t9 Jun 1</code>\n\n';
+        reply += '<i>If task is in backlog and new date is not overdue, it auto-restores to original priority.</i>';
       } else {
-        const oldDue  = foundTask.due || 'no due date';
-        foundTask.due = dateParts;
-
-        let restored    = false;
-        let restorePrio = null;
-
-        if (foundPrio === 'backlog' && !isOverdue(foundTask)) {
-          restorePrio = foundTask.backlogFrom || 'medium';
-          delete foundTask.backlogFrom;
-          delete foundTask.movedToBacklog;
-          tasks[restorePrio].push(foundTask);
-          tasks.backlog = tasks.backlog.filter(t => t.id !== id);
-          restored = true;
+        const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+        if (!tasks) { reply = '⚠️ No dashboard data found.'; }
+        else {
+          if (!tasks.backlog) tasks.backlog = [];
+          let foundTask = null;
+          let foundPrio = null;
+          for (const prio of ['critical', 'high', 'medium', 'backlog']) {
+            const t = (tasks[prio] || []).find(t => t.id === id);
+            if (t) { foundTask = t; foundPrio = prio; break; }
+          }
+          if (!foundTask) {
+            reply = `⚠️ Task <code>${id}</code> not found.`;
+          } else {
+            const oldDue  = foundTask.due || 'no due date';
+            foundTask.due = dateParts;
+            let restored    = false;
+            let restorePrio = null;
+            if (foundPrio === 'backlog' && !isOverdue(foundTask)) {
+              restorePrio = foundTask.backlogFrom || 'medium';
+              delete foundTask.backlogFrom;
+              delete foundTask.movedToBacklog;
+              tasks[restorePrio].push(foundTask);
+              tasks.backlog = tasks.backlog.filter(t => t.id !== id);
+              restored = true;
+            }
+            await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+            reply  = `📅 <b>Due date updated!</b>\n\n`;
+            reply += `🆔 <code>${id}</code> ${foundTask.text}\n`;
+            reply += `👤 ${foundTask.assign || '—'}\n\n`;
+            reply += `Old due: <s>${oldDue}</s>\n`;
+            reply += `New due: <b>${dateParts}</b>\n`;
+            if (restored) {
+              reply += `\n✅ <b>Restored from Backlog → ${restorePrio.toUpperCase()}</b>\n`;
+              reply += `<i>No longer overdue — moved back to ${restorePrio} priority.</i>`;
+            } else if (foundPrio === 'backlog') {
+              reply += `\n📦 <i>Still in Backlog (new date is still overdue).</i>`;
+            }
+            reply += `\n\n<i>Dashboard updates within 30 seconds.</i>`;
+          }
         }
-
-        await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
-
-        reply  = `📅 <b>Due date updated!</b>\n\n`;
-        reply += `🆔 <code>${id}</code> ${foundTask.text}\n`;
-        reply += `👤 ${foundTask.assign || '—'}\n\n`;
-        reply += `Old due: <s>${oldDue}</s>\n`;
-        reply += `New due: <b>${dateParts}</b>\n`;
-
-        if (restored) {
-          reply += `\n✅ <b>Restored from Backlog → ${restorePrio.toUpperCase()}</b>\n`;
-          reply += `<i>No longer overdue — moved back to ${restorePrio} priority.</i>`;
-        } else if (foundPrio === 'backlog') {
-          reply += `\n📦 <i>Still in Backlog (new date is still overdue).</i>`;
-        }
-
-        reply += `\n\n<i>Dashboard updates within 30 seconds.</i>`;
       }
     }
-  }
-}
 
-// ════════════════════════════════════════
-// /reassign [id] [name]
-// ════════════════════════════════════════
-else if (command === '/reassign') {
-  const id   = args[0];
-  const name = args.slice(1).join(' ').trim();
-
-  if (!id || !name) {
-    reply  = '⚠️ Usage: <code>/reassign [task-id] [name]</code>\n\n';
-    reply += 'Examples:\n';
-    reply += '• <code>/reassign t5 Rolf</code>\n';
-    reply += '• <code>/reassign t12 Ted</code>\n';
-    reply += '• <code>/reassign t3 Rejy Joash</code>\n\n';
-    reply += `<b>Team:</b>\n${teamListStr()}`;
-  } else {
-    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
-    if (!tasks) { reply = '⚠️ No dashboard data found.'; }
-    else {
-      if (!tasks.backlog) tasks.backlog = [];
-      let foundTask = null;
-      let foundPrio = null;
-
-      for (const prio of ['critical', 'high', 'medium', 'backlog']) {
-        const t = (tasks[prio] || []).find(t => t.id === id);
-        if (t) { foundTask = t; foundPrio = prio; break; }
-      }
-
-      if (!foundTask) {
-        reply = `⚠️ Task <code>${id}</code> not found.`;
+    // ════════════════════════════════════════
+    // /reassign [id] [name]
+    // ════════════════════════════════════════
+    else if (command === '/reassign') {
+      const id   = args[0];
+      const name = args.slice(1).join(' ').trim();
+      if (!id || !name) {
+        reply  = '⚠️ Usage: <code>/reassign [task-id] [name]</code>\n\n';
+        reply += 'Examples:\n';
+        reply += '• <code>/reassign t5 Rolf</code>\n';
+        reply += '• <code>/reassign t12 Ted</code>\n';
+        reply += '• <code>/reassign t3 Rejy Joash</code>\n\n';
+        reply += `<b>Team:</b>\n${teamListStr()}`;
       } else {
-        const nameLower = name.toLowerCase();
-        const matched   = ALL_NAMES.find(n =>
-          n.toLowerCase().includes(nameLower) ||
-          nameLower.includes(n.toLowerCase().split(' ')[0])
-        );
-        const finalName  = matched || name;
-        const oldAssign  = foundTask.assign || '—';
-        foundTask.assign = finalName;
-
-        await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
-
-        reply  = `👤 <b>Task reassigned!</b>\n\n`;
-        reply += `🆔 <code>${id}</code> ${foundTask.text}\n\n`;
-        reply += `From: <s>${oldAssign}</s>\n`;
-        reply += `To: <b>${finalName}</b>\n`;
-        reply += `Priority: ${foundPrio.toUpperCase()}\n`;
-        reply += foundTask.due ? `Due: ${foundTask.due}\n` : '';
-        if (!matched) {
-          reply += `\n⚠️ <i>"${name}" not found in team list — saved as entered.</i>`;
+        const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+        if (!tasks) { reply = '⚠️ No dashboard data found.'; }
+        else {
+          if (!tasks.backlog) tasks.backlog = [];
+          let foundTask = null;
+          let foundPrio = null;
+          for (const prio of ['critical', 'high', 'medium', 'backlog']) {
+            const t = (tasks[prio] || []).find(t => t.id === id);
+            if (t) { foundTask = t; foundPrio = prio; break; }
+          }
+          if (!foundTask) {
+            reply = `⚠️ Task <code>${id}</code> not found.`;
+          } else {
+            const nameLower = name.toLowerCase();
+            const matched   = ALL_NAMES.find(n =>
+              n.toLowerCase().includes(nameLower) ||
+              nameLower.includes(n.toLowerCase().split(' ')[0])
+            );
+            const finalName  = matched || name;
+            const oldAssign  = foundTask.assign || '—';
+            foundTask.assign = finalName;
+            await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+            reply  = `👤 <b>Task reassigned!</b>\n\n`;
+            reply += `🆔 <code>${id}</code> ${foundTask.text}\n\n`;
+            reply += `From: <s>${oldAssign}</s>\n`;
+            reply += `To: <b>${finalName}</b>\n`;
+            reply += `Priority: ${foundPrio.toUpperCase()}\n`;
+            reply += foundTask.due ? `Due: ${foundTask.due}\n` : '';
+            if (!matched) {
+              reply += `\n⚠️ <i>"${name}" not found in team list — saved as entered.</i>`;
+            }
+            reply += `\n\n<i>Dashboard updates within 30 seconds.</i>`;
+          }
         }
-        reply += `\n\n<i>Dashboard updates within 30 seconds.</i>`;
       }
     }
-  }
-}
+
+    // ════════════════════════════════════════
+    // /help
+    // ════════════════════════════════════════
+    else if (command === '/help') {
+      reply  = `📖 <b>DEVCON OPS BOT — COMMANDS</b>\n\n`;
+      reply += `<b>── TASKS ──</b>\n`;
+      reply += `/tasks — list all open tasks by priority\n`;
+      reply += `/done [id] — mark done · <code>/done t1</code>\n`;
+      reply += `/undone [id] — reopen · <code>/undone t1</code>\n`;
+      reply += `/addtask [natural language] — add task (always include who)\n`;
+      reply += `  <code>/addtask Rolf to confirm Tacloban date, high</code>\n`;
+      reply += `/deltask [id] — delete · <code>/deltask t5</code>\n`;
+      reply += `/setdue [id] [date] — update deadline · <code>/setdue t1 Apr 21</code>\n`;
+      reply += `  <i>Auto-restores from backlog if new date not overdue</i>\n`;
+      reply += `/reassign [id] [name] — change assignee · <code>/reassign t5 Rolf</code>\n\n`;
+      reply += `<b>── FILTER ──</b>\n`;
+      reply += `/mytasks [name or group]\n`;
+      reply += `  person: <code>/mytasks Jedd</code> · <code>/mytasks Rolf</code>\n`;
+      reply += `  group: <code>/mytasks hq</code> · <code>/mytasks chapters</code> · <code>/mytasks interns</code>\n`;
+      reply += `  chapter: <code>/mytasks Tacloban</code> · <code>/mytasks Cebu</code>\n`;
+      reply += `  cohort: <code>/mytasks cohort 3</code> · <code>/mytasks cohort 4</code>\n\n`;
+      reply += `<b>── RISKS ──</b>\n`;
+      reply += `/risks — list open risks\n`;
+      reply += `/resolve [id] — toggle resolved · <code>/resolve r4</code>\n\n`;
+      reply += `<b>── BUDGET ──</b>\n`;
+      reply += `/budget — view all line items\n`;
+      reply += `/updatespent [id] [amount] · <code>/updatespent b1 50000</code>\n`;
+      reply += `/update [natural language] · <code>/update line 5 is now 62500</code>\n\n`;
+      reply += `<b>── INFO ──</b>\n`;
+      reply += `/status — quick ops summary\n`;
+      reply += `/chatid — get this chat's ID\n`;
+      reply += `/ping — bot online check\n`;
+      reply += `/ask [question] — AI assistant\n`;
+      reply += `reply to bot message — AI follow-up\n\n`;
+      reply += `<b>── TEAM ──</b>\n`;
+      reply += teamListStr();
+    }
 
     // ════════════════════════════════════════
     // Unknown
