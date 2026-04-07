@@ -997,23 +997,43 @@ function renderTasks() {
     const active = items.filter(t => !t.done);
     const done   = items.filter(t => t.done);
 
-    function taskRow(t, realIdx, isDone) {
-      const overdue  = isOverdue(t);
-      const isBacklog = prio === 'backlog';
-      const prioClass = isBacklog ? (t.backlogFrom || 'medium') : prio;
-      return `<div class="task-row" id="tr-${t.id}" style="${isDone ? 'opacity:.5' : ''}">
-        <div class="task-check ${isDone ? 'done' : ''}" onclick="toggleTask('${prio}',${realIdx})"></div>
-        <span class="task-id-badge">${h(t.id)}</span>
-        <div style="display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden">
-          <div class="task-text ${isDone ? 'done' : ''}">${h(t.text)}</div>
-          ${isBacklog && t.backlogFrom ? `<span style="font-family:var(--mono);font-size:10px;color:var(--org);margin-top:1px">↑ was ${t.backlogFrom.toUpperCase()}</span>` : ''}
-        </div>
-        <span class="task-assign">${h(t.assign || '—')}</span>
-        <span class="task-due ${overdue && !isDone ? 'overdue' : ''}">${t.due || ''}</span>
-        <div class="task-prio ${prioClass}"></div>
-        <button class="task-del" onclick="deleteTask('${prio}',${realIdx})" title="Delete task">✕</button>
-      </div>`;
-    }
+function taskRow(t, realIdx, isDone) {
+  const overdue   = isOverdue(t);
+  const isBacklog = prio === 'backlog';
+  const prioClass = isBacklog ? (t.backlogFrom || 'medium') : prio;
+
+  const dueLabel = t.due
+    ? `<span class="task-due ${overdue && !isDone ? 'overdue' : ''}">${h(t.due)}</span>`
+    : `<span style="font-family:var(--mono);font-size:10px;color:var(--dim)">no due</span>`;
+
+  return `<div class="task-row" id="tr-${t.id}" style="${isDone ? 'opacity:.5' : ''}">
+    <div class="task-check ${isDone ? 'done' : ''}" onclick="toggleTask('${prio}',${realIdx})"></div>
+    <span class="task-id-badge">${h(t.id)}</span>
+    <div style="display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden">
+      <div class="task-text ${isDone ? 'done' : ''}">${h(t.text)}</div>
+      ${isBacklog && t.backlogFrom ? `<span style="font-family:var(--mono);font-size:10px;color:var(--org);margin-top:1px">↑ was ${t.backlogFrom.toUpperCase()}</span>` : ''}
+    </div>
+    <span class="task-assign"
+      onclick="editTaskAssign('${prio}',${realIdx})"
+      title="Click to reassign"
+      style="cursor:pointer"
+      onmouseover="this.style.background='rgba(56,189,248,.18)'"
+      onmouseout="this.style.background='rgba(56,189,248,.08)'"
+    >${h(t.assign || '⚠ unassigned')}</span>
+    <span style="display:flex;align-items:center;gap:4px;white-space:nowrap">
+      ${dueLabel}
+      <button
+        onclick="editTaskDue('${prio}',${realIdx})"
+        title="Edit due date"
+        style="background:transparent;border:1px solid var(--bdr);border-radius:4px;padding:1px 5px;font-family:var(--mono);font-size:9px;color:var(--dim);cursor:pointer;transition:all .15s;line-height:1.4;flex-shrink:0"
+        onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc)'"
+        onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'"
+      >📅</button>
+    </span>
+    <div class="task-prio ${prioClass}"></div>
+    <button class="task-del" onclick="deleteTask('${prio}',${realIdx})" title="Delete task">✕</button>
+  </div>`;
+}
 
     // Active rows — use index in the FULL (unfiltered) array for toggle/delete to work correctly
     let html = active.map(t => {
@@ -1138,6 +1158,64 @@ function deleteTask(prio, idx) {
   if(!confirm('Delete this task?')) return;
   tasks[prio].splice(idx, 1);
   saveState(); renderTasks();
+}
+
+function editTaskDue(prio, idx) {
+  const task = (tasks[prio] || [])[idx];
+  if (!task) return;
+
+  const current = task.due || 'no due date';
+  const newDue  = prompt(
+    `Update due date:\n"${task.text}"\nAssigned to: ${task.assign || '—'}\n\nCurrent due: ${current}\n\nEnter new due date (e.g. Apr 21, May 15):\nLeave blank to remove due date.`,
+    task.due || ''
+  );
+  if (newDue === null) return;
+
+  task.due = newDue.trim();
+
+  // If in backlog and new due date is no longer overdue → offer restore
+  if (prio === 'backlog' && task.due && !isOverdue(task)) {
+    const restorePrio = task.backlogFrom || 'medium';
+    const restore = confirm(
+      `"${task.due}" is not overdue yet.\n\nRestore this task to ${restorePrio.toUpperCase()} priority?`
+    );
+    if (restore) {
+      delete task.backlogFrom;
+      delete task.movedToBacklog;
+      tasks[restorePrio].push(task);
+      tasks.backlog = tasks.backlog.filter(t => t.id !== task.id);
+    }
+  }
+
+  saveState();
+  renderTasks();
+}
+
+function editTaskAssign(prio, idx) {
+  const task = (tasks[prio] || [])[idx];
+  if (!task) return;
+
+  const memberList = [
+    'HQ: ' + TEAM.hq.join(', '),
+    'Chapters: ' + Object.entries(TEAM.chapters).map(([ch, names]) => `${names[0]} (${ch})`).join(', '),
+    'Interns C3: ' + TEAM.interns['Cohort 3'].join(', '),
+    'Interns C4: ' + TEAM.interns['Cohort 4'].join(', '),
+  ].join('\n');
+
+  let newAssign = '';
+  while (!newAssign) {
+    const input = prompt(
+      `Reassign task:\n"${task.text}"\n\nCurrent: ${task.assign || '—'}\n\n${memberList}\n\nEnter new assignee (required):`,
+      task.assign || ''
+    );
+    if (input === null) return;
+    newAssign = input.trim();
+    if (!newAssign) alert('An assignee is required.');
+  }
+
+  task.assign = newAssign;
+  saveState();
+  renderTasks();
 }
   
 function clearDone(section) {
