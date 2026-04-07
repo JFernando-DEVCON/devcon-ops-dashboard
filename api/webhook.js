@@ -26,6 +26,23 @@ const TEAM = {
   }
 };
 
+// Flat list of all names
+const ALL_NAMES = [
+  ...TEAM.hq,
+  ...Object.values(TEAM.chapters).flat(),
+  ...Object.values(TEAM.interns).flat()
+];
+
+// Team list string for prompts and help
+function teamListStr() {
+  return [
+    `HQ: ${TEAM.hq.join(', ')}`,
+    `Chapters: ${Object.entries(TEAM.chapters).map(([ch, names]) => `${names[0]} (${ch})`).join(', ')}`,
+    `Interns C3: ${TEAM.interns['Cohort 3'].join(', ')}`,
+    `Interns C4: ${TEAM.interns['Cohort 4'].join(', ')}`,
+  ].join('\n');
+}
+
 // ── KV HELPERS ──
 async function kvSet(key, value, url, token) {
   const r = await fetch(`${url}/set/${key}`, {
@@ -246,69 +263,103 @@ export default async function handler(req, res) {
     // ════════════════════════════════════════
     // /addtask [natural language]
     // ════════════════════════════════════════
-    else if (command === '/addtask') {
-      const query = args.join(' ').trim();
-      if (!query) {
-        reply = '⚠️ Usage: <code>/addtask [describe the task naturally]</code>\n\n';
-        reply += 'Examples:\n';
-        reply += '• <code>/addtask Follow up Rolf on Tacloban date, high priority</code>\n';
-        reply += '• <code>/addtask Submit BIR invoices assign to Jedd, critical</code>\n';
-        reply += '• <code>/addtask paalamin si Zhi sa Bukidnon ocular, high</code>\n\n';
-        reply += '<i>Auto-sets 7-day deadline on creation.</i>';
-      } else {
-        const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
-        if (!tasks) { reply = '⚠️ No dashboard data found.'; }
-        else {
-          if (!tasks.backlog) tasks.backlog = [];
-          const newId = nextTaskId(tasks);
-          const anthropic = new Anthropic({ apiKey: CLAUDE_KEY });
-          const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 300,
-            system: `You extract task details from natural language for a Filipino ops team dashboard.
+else if (command === '/addtask') {
+  const query = args.join(' ').trim();
+  if (!query) {
+    reply  = '⚠️ Usage: <code>/addtask [describe the task naturally]</code>\n\n';
+    reply += '⚠️ <b>Always mention who the task is for.</b>\n';
+    reply += 'Task will not be created without a clear assignee.\n\n';
+    reply += '<b>Examples:</b>\n';
+    reply += '• <code>/addtask Rolf to confirm Tacloban new date, high</code>\n';
+    reply += '• <code>/addtask Jedd to submit BIR invoices, critical, by Apr 21</code>\n';
+    reply += '• <code>/addtask paalamin si Zhi sa Bukidnon ocular, high</code>\n';
+    reply += '• <code>/addtask Ted to confirm CPU Iloilo venue by May 1</code>\n';
+    reply += '• <code>/addtask Dom to draft Q2 narrative, medium</code>\n\n';
+    reply += '<b>Assignee detection:</b>\n';
+    reply += '• Name: "Rolf to follow up" → Rolf\n';
+    reply += '• Filipino: "si Zhi", "kay Dom" → Zhi, Dom\n';
+    reply += '• Chapter: "Tacloban task" → Rolf, "Iloilo" → Ted\n\n';
+    reply += `<b>Team:</b>\n${teamListStr()}`;
+  } else {
+    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+    if (!tasks) { reply = '⚠️ No dashboard data found.'; }
+    else {
+      if (!tasks.backlog) tasks.backlog = [];
+      const newId = nextTaskId(tasks);
+      const anthropic = new Anthropic({ apiKey: CLAUDE_KEY });
+
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        system: `You extract task details from natural language for a Filipino ops team dashboard.
 Return ONLY valid JSON, no markdown, no explanation, no backticks.
 
-Team members: Jedd, Dom, Lady, Rolf, Marica, Ted, Zhi, Joash, Jianyi, Michael Lance, RJ, Precious, Danmel, Rejy Joash, JP Remar Serrano, Sabrinah, Christian Jake Geonzon, Reyche, Clayton, Dale, Zendy, Kien, Kenshin, Allyza
+TEAM MEMBERS BY GROUP:
+HQ / National Office: Jedd, Dom, Michael Lance, Marica, RJ
+Chapter Leaders: Precious (Manila), Rolf (Tacloban), Ted (Iloilo), Zhi (Bukidnon), Danmel (Laguna), Rejy Joash (Pampanga), JP Remar Serrano (Legazpi), Sabrinah (Cebu), Christian Jake Geonzon (Davao), Reyche (Iligan)
+Interns Cohort 3: Lady, Kien, Kenshin, Allyza
+Interns Cohort 4: Clayton, Dale, Zendy
+
+Current date: ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
 
 Return exactly:
 {"text":"clean task description","priority":"critical|high|medium","assign":"TeamMemberName","due":""}
 
 Rules:
-- priority: critical=urgent/asap/agad, high=important/priority, medium=default/this week
-- assign: closest team member name, default Jedd if none found
-- text: clean English description (translate Filipino)
-- due: always empty string`,
-            messages: [{ role: 'user', content: query }]
-          });
+- text: clean English description, translate Filipino if needed
+- priority: critical=urgent/asap/agad, high=important/priority, medium=this week/normal/default
+- assign: CRITICAL — look hard for any name, pronoun, chapter, or role hint:
+    * explicit name: "for Rolf", "assign to Ted", "si Zhi", "kay Dom" → use that exact name
+    * chapter hint: "Tacloban" → Rolf, "Iloilo" → Ted, "Bukidnon" → Zhi, "Pampanga" → Rejy Joash, "Manila" → Precious, "Laguna" → Danmel, "Legazpi" → JP Remar Serrano, "Cebu" → Sabrinah, "Davao" → Christian Jake Geonzon, "Iligan" → Reyche
+    * first person: "I need to", "ko", "akin", "ako" → Jedd (sender context)
+    * NEVER default to Jedd unless there is a clear first-person indicator
+    * If no person can be identified at all → return "UNASSIGNED"
+- due: extract date if mentioned ("by Apr 21", "before May 6", "this Friday") as "Mon DD" like "Apr 21". Empty string "" if no date mentioned.`,
+        messages: [{ role: 'user', content: query }]
+      });
 
-          try {
-            const parsed = JSON.parse(response.content[0].text.trim());
-            const priority = ['critical','high','medium'].includes(parsed.priority) ? parsed.priority : 'medium';
-            const newTask = {
-              id: newId,
-              text: parsed.text,
-              assign: parsed.assign || 'Jedd',
-              due: sevenDayDue(),
-              done: false,
-              created: new Date().toISOString()
-            };
-            tasks[priority].push(newTask);
-            await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
-            const icon = priority === 'critical' ? '🔴' : priority === 'high' ? '🟠' : '🟡';
-            reply  = `${icon} <b>Task added!</b>\n\n`;
-            reply += `📋 ${newTask.text}\n`;
-            reply += `👤 Assigned to: <b>${newTask.assign}</b>\n`;
-            reply += `📊 Priority: <b>${priority.toUpperCase()}</b>\n`;
-            reply += `📅 Due: <b>${newTask.due}</b>\n`;
-            reply += `🆔 ID: <code>${newId}</code>\n\n`;
-            reply += `<i>Refresh dashboard to see changes.</i>`;
-          } catch {
-            reply = '⚠️ Could not parse that task. Try:\n<code>/addtask Follow up Rolf on Tacloban, high priority</code>';
-          }
+      try {
+        const parsed = JSON.parse(response.content[0].text.trim());
+        const priority = ['critical','high','medium'].includes(parsed.priority) ? parsed.priority : 'medium';
+
+        // Block if no assignee detected
+        if (!parsed.assign || parsed.assign === 'UNASSIGNED') {
+          reply  = `⚠️ <b>No assignee detected.</b>\n\n`;
+          reply += `📋 Task text: "${parsed.text}"\n\n`;
+          reply += `Please mention who this task is for and try again.\n\n`;
+          reply += '<b>Examples:</b>\n';
+          reply += `• <code>/addtask ${parsed.text}, assign to Rolf, high</code>\n`;
+          reply += `• <code>/addtask ${parsed.text} for Ted by May 6</code>\n\n`;
+          reply += `<b>Team:</b>\n${teamListStr()}`;
+        } else {
+          const newTask = {
+            id:      newId,
+            text:    parsed.text,
+            assign:  parsed.assign,
+            due:     parsed.due && parsed.due.trim() ? parsed.due.trim() : sevenDayDue(),
+            done:    false,
+            created: new Date().toISOString()
+          };
+          tasks[priority].push(newTask);
+          await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+
+          const icon = priority === 'critical' ? '🔴' : priority === 'high' ? '🟠' : '🟡';
+          reply  = `${icon} <b>Task added!</b>\n\n`;
+          reply += `📋 ${newTask.text}\n`;
+          reply += `👤 Assigned: <b>${newTask.assign}</b>\n`;
+          reply += `📊 Priority: <b>${priority.toUpperCase()}</b>\n`;
+          reply += `📅 Due: <b>${newTask.due}</b>\n`;
+          reply += `🆔 ID: <code>${newId}</code>\n\n`;
+          reply += `<i>Wrong assignee?</i> <code>/reassign ${newId} [name]</code>\n`;
+          reply += `<i>Wrong deadline?</i> <code>/setdue ${newId} [date]</code>`;
         }
+      } catch {
+        reply  = '⚠️ Could not parse that task. Try:\n';
+        reply += '<code>/addtask Rolf to confirm Tacloban date, high priority</code>';
       }
     }
-
+  }
+}
     // ════════════════════════════════════════
     // /deltask [id]
     // ════════════════════════════════════════
@@ -664,34 +715,166 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
     // ════════════════════════════════════════
     // /help
     // ════════════════════════════════════════
-    else if (command === '/help') {
-      reply  = `📖 <b>DEVCON OPS BOT — COMMANDS</b>\n\n`;
-      reply += `<b>TASKS</b>\n`;
-      reply += `/tasks — list all open tasks by priority\n`;
-      reply += `/done [id] — mark task done · <code>/done t1</code>\n`;
-      reply += `/undone [id] — reopen task · <code>/undone t1</code>\n`;
-      reply += `/addtask [natural language] — add task (auto 7-day due)\n`;
-      reply += `  <code>/addtask remind Jedd to collect BIR invoices, urgent</code>\n`;
-      reply += `/deltask [id] — delete task · <code>/deltask t5</code>\n\n`;
-      reply += `<b>FILTER BY PERSON / GROUP</b>\n`;
-      reply += `/mytasks [name or group] — tasks sorted by priority\n`;
-      reply += `  by person: <code>/mytasks Jedd</code>\n`;
-      reply += `  by group: <code>/mytasks hq</code> · <code>/mytasks chapters</code> · <code>/mytasks interns</code>\n`;
-      reply += `  by chapter: <code>/mytasks Tacloban</code> · <code>/mytasks Cebu</code>\n`;
-      reply += `  by cohort: <code>/mytasks cohort 3</code> · <code>/mytasks cohort 4</code>\n\n`;
-      reply += `<b>RISKS</b>\n`;
-      reply += `/risks — list all open risks\n`;
-      reply += `/resolve [id] — toggle risk resolved · <code>/resolve r4</code>\n\n`;
-      reply += `<b>BUDGET</b>\n`;
-      reply += `/budget — view all line items\n`;
-      reply += `/updatespent [id] [amount] — update spent · <code>/updatespent b1 50000</code>\n`;
-      reply += `/update [natural language] — <code>/update line 5 is now 62500</code>\n\n`;
-      reply += `<b>INFO</b>\n`;
-      reply += `/status — quick ops summary with backlog count\n`;
-      reply += `/ping — check bot is online\n`;
-      reply += `/ask [question] — AI assistant with full ops context\n`;
-      reply += `reply to any bot message to ask follow-ups\n`;
+  else if (command === '/help') {
+  reply  = `📖 <b>DEVCON OPS BOT — COMMANDS</b>\n\n`;
+
+  reply += `<b>── TASKS ──</b>\n`;
+  reply += `/tasks — list all open tasks by priority\n`;
+  reply += `/done [id] — mark done · <code>/done t1</code>\n`;
+  reply += `/undone [id] — reopen · <code>/undone t1</code>\n`;
+  reply += `/addtask [natural language] — add task (always include who)\n`;
+  reply += `  <code>/addtask Rolf to confirm Tacloban date, high</code>\n`;
+  reply += `/deltask [id] — delete · <code>/deltask t5</code>\n`;
+  reply += `/setdue [id] [date] — update deadline · <code>/setdue t1 Apr 21</code>\n`;
+  reply += `  <i>Auto-restores from backlog if new date not overdue</i>\n`;
+  reply += `/reassign [id] [name] — change assignee · <code>/reassign t5 Rolf</code>\n\n`;
+
+  reply += `<b>── FILTER ──</b>\n`;
+  reply += `/mytasks [name or group]\n`;
+  reply += `  person: <code>/mytasks Jedd</code> · <code>/mytasks Rolf</code>\n`;
+  reply += `  group: <code>/mytasks hq</code> · <code>/mytasks chapters</code> · <code>/mytasks interns</code>\n`;
+  reply += `  chapter: <code>/mytasks Tacloban</code> · <code>/mytasks Cebu</code>\n`;
+  reply += `  cohort: <code>/mytasks cohort 3</code> · <code>/mytasks cohort 4</code>\n\n`;
+
+  reply += `<b>── RISKS ──</b>\n`;
+  reply += `/risks — list open risks\n`;
+  reply += `/resolve [id] — toggle resolved · <code>/resolve r4</code>\n\n`;
+
+  reply += `<b>── BUDGET ──</b>\n`;
+  reply += `/budget — view all line items\n`;
+  reply += `/updatespent [id] [amount] · <code>/updatespent b1 50000</code>\n`;
+  reply += `/update [natural language] · <code>/update line 5 is now 62500</code>\n\n`;
+
+  reply += `<b>── INFO ──</b>\n`;
+  reply += `/status — quick ops summary\n`;
+  reply += `/ping — bot online check\n`;
+  reply += `/ask [question] — AI assistant\n`;
+  reply += `reply to bot message — AI follow-up\n\n`;
+
+  reply += `<b>── TEAM ──</b>\n`;
+  reply += teamListStr();
+}
+      // ════════════════════════════════════════
+// /setdue [id] [date]
+// ════════════════════════════════════════
+else if (command === '/setdue') {
+  const id        = args[0];
+  const dateParts = args.slice(1).join(' ').trim();
+
+  if (!id || !dateParts) {
+    reply  = '⚠️ Usage: <code>/setdue [task-id] [new due date]</code>\n\n';
+    reply += 'Examples:\n';
+    reply += '• <code>/setdue t1 Apr 21</code>\n';
+    reply += '• <code>/setdue t4 May 15</code>\n';
+    reply += '• <code>/setdue t9 Jun 1</code>\n\n';
+    reply += '<i>If task is in backlog and new date is not overdue, it auto-restores to original priority.</i>';
+  } else {
+    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+    if (!tasks) { reply = '⚠️ No dashboard data found.'; }
+    else {
+      if (!tasks.backlog) tasks.backlog = [];
+      let foundTask = null;
+      let foundPrio = null;
+
+      for (const prio of ['critical', 'high', 'medium', 'backlog']) {
+        const t = (tasks[prio] || []).find(t => t.id === id);
+        if (t) { foundTask = t; foundPrio = prio; break; }
+      }
+
+      if (!foundTask) {
+        reply = `⚠️ Task <code>${id}</code> not found.`;
+      } else {
+        const oldDue  = foundTask.due || 'no due date';
+        foundTask.due = dateParts;
+
+        let restored    = false;
+        let restorePrio = null;
+
+        if (foundPrio === 'backlog' && !isOverdue(foundTask)) {
+          restorePrio = foundTask.backlogFrom || 'medium';
+          delete foundTask.backlogFrom;
+          delete foundTask.movedToBacklog;
+          tasks[restorePrio].push(foundTask);
+          tasks.backlog = tasks.backlog.filter(t => t.id !== id);
+          restored = true;
+        }
+
+        await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+
+        reply  = `📅 <b>Due date updated!</b>\n\n`;
+        reply += `🆔 <code>${id}</code> ${foundTask.text}\n`;
+        reply += `👤 ${foundTask.assign || '—'}\n\n`;
+        reply += `Old due: <s>${oldDue}</s>\n`;
+        reply += `New due: <b>${dateParts}</b>\n`;
+
+        if (restored) {
+          reply += `\n✅ <b>Restored from Backlog → ${restorePrio.toUpperCase()}</b>\n`;
+          reply += `<i>No longer overdue — moved back to ${restorePrio} priority.</i>`;
+        } else if (foundPrio === 'backlog') {
+          reply += `\n📦 <i>Still in Backlog (new date is still overdue).</i>`;
+        }
+
+        reply += `\n\n<i>Dashboard updates within 30 seconds.</i>`;
+      }
     }
+  }
+}
+
+// ════════════════════════════════════════
+// /reassign [id] [name]
+// ════════════════════════════════════════
+else if (command === '/reassign') {
+  const id   = args[0];
+  const name = args.slice(1).join(' ').trim();
+
+  if (!id || !name) {
+    reply  = '⚠️ Usage: <code>/reassign [task-id] [name]</code>\n\n';
+    reply += 'Examples:\n';
+    reply += '• <code>/reassign t5 Rolf</code>\n';
+    reply += '• <code>/reassign t12 Ted</code>\n';
+    reply += '• <code>/reassign t3 Rejy Joash</code>\n\n';
+    reply += `<b>Team:</b>\n${teamListStr()}`;
+  } else {
+    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+    if (!tasks) { reply = '⚠️ No dashboard data found.'; }
+    else {
+      if (!tasks.backlog) tasks.backlog = [];
+      let foundTask = null;
+      let foundPrio = null;
+
+      for (const prio of ['critical', 'high', 'medium', 'backlog']) {
+        const t = (tasks[prio] || []).find(t => t.id === id);
+        if (t) { foundTask = t; foundPrio = prio; break; }
+      }
+
+      if (!foundTask) {
+        reply = `⚠️ Task <code>${id}</code> not found.`;
+      } else {
+        const nameLower = name.toLowerCase();
+        const matched   = ALL_NAMES.find(n =>
+          n.toLowerCase().includes(nameLower) ||
+          nameLower.includes(n.toLowerCase().split(' ')[0])
+        );
+        const finalName  = matched || name;
+        const oldAssign  = foundTask.assign || '—';
+        foundTask.assign = finalName;
+
+        await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+
+        reply  = `👤 <b>Task reassigned!</b>\n\n`;
+        reply += `🆔 <code>${id}</code> ${foundTask.text}\n\n`;
+        reply += `From: <s>${oldAssign}</s>\n`;
+        reply += `To: <b>${finalName}</b>\n`;
+        reply += `Priority: ${foundPrio.toUpperCase()}\n`;
+        reply += foundTask.due ? `Due: ${foundTask.due}\n` : '';
+        if (!matched) {
+          reply += `\n⚠️ <i>"${name}" not found in team list — saved as entered.</i>`;
+        }
+        reply += `\n\n<i>Dashboard updates within 30 seconds.</i>`;
+      }
+    }
+  }
+}
 
     // ════════════════════════════════════════
     // Unknown
