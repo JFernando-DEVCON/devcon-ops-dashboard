@@ -1071,14 +1071,59 @@ function toggleTask(prio, idx) {
 
 function addTask(prio, input) {
   const text = input.value.trim();
-  if(!text) return;
-  const id = 't'+Date.now();
-  const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 7);
-  const due = dueDate.toLocaleDateString('en-PH',{month:'short',day:'numeric'});
-  tasks[prio].push({id,text,assign:'Jedd',due,done:false,created:new Date().toISOString()});
-  input.value='';
-  saveState(); renderTasks();
+  if (!text) return;
+ 
+  // Build full team list from TEAM config
+  const allMembers = [
+    ...TEAM.hq,
+    ...Object.values(TEAM.chapters).flat(),
+    ...Object.values(TEAM.interns).flat()
+  ];
+  const memberList = [
+    'HQ: ' + TEAM.hq.join(', '),
+    'Chapters: ' + Object.entries(TEAM.chapters).map(([ch, names]) => `${names[0]} (${ch})`).join(', '),
+    'Interns C3: ' + TEAM.interns['Cohort 3'].join(', '),
+    'Interns C4: ' + TEAM.interns['Cohort 4'].join(', '),
+  ].join('\n');
+ 
+  // Step 1 — Assignee (required, no default)
+  let assign = '';
+  while (!assign) {
+    const inputAssign = prompt(
+      `Assign this task to:\n\n"${text}"\n\n${memberList}\n\nType a name (required — no default):`,
+      ''
+    );
+    if (inputAssign === null) return; // user cancelled — abort
+    assign = inputAssign.trim();
+    if (!assign) {
+      alert('An assignee is required. Please enter who is responsible for this task.');
+    }
+  }
+ 
+  // Step 2 — Due date (default 7 days, adjustable)
+  const defaultDue = new Date();
+  defaultDue.setDate(defaultDue.getDate() + 7);
+  const defaultDueStr = defaultDue.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+ 
+  const inputDue = prompt(
+    `Set due date for this task:\n\n"${text}"\nAssigned to: ${assign}\n\nDefault: ${defaultDueStr} (7 days from today)\nEnter a date (e.g. Apr 21, May 6) or leave blank to use default:`,
+    defaultDueStr
+  );
+  if (inputDue === null) return; // user cancelled — abort
+  const due = inputDue.trim() || defaultDueStr;
+ 
+  const id = 't' + Date.now();
+  tasks[prio].push({
+    id,
+    text,
+    assign,
+    due,
+    done:    false,
+    created: new Date().toISOString()
+  });
+  input.value = '';
+  saveState();
+  renderTasks();
 }
 
 function toggleDoneSection(prio) {
