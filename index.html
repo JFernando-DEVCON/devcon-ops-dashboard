@@ -469,13 +469,32 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <div class="page" id="page-tasks">
   <div class="pg-header">
     <div><div class="pg-title">National Tasks</div><div class="pg-sub">HQ ACTION ITEMS · JEDD & DOM</div></div>
-<div style="display:flex;gap:8px;align-items:center">
-  <span style="font-family:var(--mono);font-size:9px;color:var(--dim)" id="sync-status"></span>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <select id="task-filter-group" class="tg-mini-input" style="width:auto;font-size:12px;padding:6px 12px;cursor:pointer" onchange="applyTaskFilter()">
+    <option value="">👥 All Groups</option>
+    <option value="hq">🏢 HQ / National Office</option>
+    <option value="chapters">🗺️ Chapter Leaders</option>
+    <option value="interns">🎓 Interns</option>
+  </select>
+  <select id="task-filter-chapter" class="tg-mini-input" style="width:auto;font-size:12px;padding:6px 12px;cursor:pointer;display:none" onchange="applyTaskFilter()">
+    <option value="">All Chapters</option>
+    <option value="Manila">Manila</option>
+    <option value="Tacloban">Tacloban</option>
+    <option value="Iloilo">Iloilo</option>
+    <option value="Bukidnon">Bukidnon</option>
+    <option value="Laguna">Laguna</option>
+    <option value="Pampanga">Pampanga</option>
+    <option value="Legazpi">Legazpi</option>
+    <option value="Cebu">Cebu</option>
+    <option value="Davao">Davao</option>
+    <option value="Iligan">Iligan</option>
+  </select>
+  <button class="btn btn-ghost btn-sm" onclick="clearTaskFilter()">✕ CLEAR</button>
   <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
   <button class="btn btn-ghost btn-sm" onclick="clearDone('tasks')">CLEAR DONE</button>
-  <button class="btn btn-acc btn-sm" onclick="addTask('medium',{value:'',focus:true})">+ ADD TASK</button>
+  <button class="btn btn-acc btn-sm" onclick="addTask('medium',document.getElementById('add-medium'))">+ ADD TASK</button>
 </div>
-  </div>
+</div>
 
   <div class="card" id="tasks-critical-card">
     <div class="card-head"><span class="card-title">🔴 CRITICAL — NEEDS ACTION NOW</span><span class="prog-pill" id="tasks-crit-prog">0/0</span></div>
@@ -489,10 +508,19 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <div class="add-task-row"><input class="add-input" id="add-high" placeholder="Add high priority task..." onkeydown="if(event.key==='Enter')addTask('high',this)"><button class="add-btn" onclick="addTask('high',document.getElementById('add-high'))">ADD</button></div>
   </div>
 
-  <div class="card">
+<div class="card">
     <div class="card-head"><span class="card-title">🟡 THIS WEEK</span><span class="prog-pill" id="tasks-med-prog">0/0</span></div>
     <div id="tasks-medium"></div>
     <div class="add-task-row"><input class="add-input" id="add-medium" placeholder="Add task..." onkeydown="if(event.key==='Enter')addTask('medium',this)"><button class="add-btn" onclick="addTask('medium',document.getElementById('add-medium'))">ADD</button></div>
+  </div>
+
+  <div class="card" id="tasks-backlog-card">
+    <div class="card-head">
+      <span class="card-title">📦 BACKLOG — OVERDUE</span>
+      <span class="prog-pill" id="tasks-backlog-prog">0/0</span>
+    </div>
+    <div id="tasks-backlog"></div>
+    <div class="add-task-row"><input class="add-input" id="add-backlog" placeholder="Add backlog task..." onkeydown="if(event.key==='Enter')addTask('backlog',this)"><button class="add-btn" onclick="addTask('backlog',document.getElementById('add-backlog'))">ADD</button></div>
   </div>
 </div>
 
@@ -650,7 +678,8 @@ const TASKS = {
     {id:'t13',text:'Pampanga: Joash to share CCA confirmation in Sui GC + start mentor recruitment',assign:'Joash',due:'Apr 7',done:false},
     {id:'t14',text:'Begin Iloilo (May 16) — CPU Jaro ocular and install planning T-30',assign:'Ted',due:'Apr 16',done:false},
     {id:'t15',text:'Draft Q2 narrative report outline for Sui Foundation (deadline Jun 30)',assign:'Dom',due:'May 1',done:false},
-  ]
+  ],
+  backlog: []
 };
 
 const CHAPTERS = [
@@ -733,7 +762,8 @@ const RISKS = [
 // ══════════════════════════════════════════════════════════════
 // STATE (session)
 // ══════════════════════════════════════════════════════════════
-let tasks    = JSON.parse(sessionStorage.getItem('tasks')||'null')    || structuredClone(TASKS);
+let tasks    = JSON.parse(sessionStorage.getItem('tasks')||'null')    || structuredClone(TASKS); 
+  if (!tasks.backlog) tasks.backlog = [];
 let risks    = JSON.parse(sessionStorage.getItem('risks')||'null')    || structuredClone(RISKS);
 let chapters = JSON.parse(sessionStorage.getItem('chapters')||'null') || structuredClone(CHAPTERS);
 let budget   = JSON.parse(sessionStorage.getItem('budget')||'null')   || structuredClone(DEFAULT_BUDGET);
@@ -881,71 +911,156 @@ function updateNavBadges() {
   const openRisks = risks.filter(r=>r.status==='open').length;
   document.getElementById('nb-overview').textContent = openCrit + openHigh;
   document.getElementById('nb-overview').className = 'nav-badge ' + (openCrit>0?'':'warn');
-  document.getElementById('nb-tasks').textContent = openCrit + openHigh + tasks.medium.filter(t=>!t.done).length;
+  document.getElementById('nb-tasks').textContent = openCrit + openHigh + tasks.medium.filter(t=>!t.done).length + (tasks.backlog||[]).filter(t=>!t.done).length;
   document.getElementById('nb-risks').textContent = openRisks;
   document.getElementById('nb-risks').className = 'nav-badge ' + (openRisks > 5 ? '' : 'warn');
 }
 
 // ══════════════════════════════════════════════════════════════
+// TEAM CONFIG — update names here when people change
+// ══════════════════════════════════════════════════════════════
+const TEAM = {
+  hq: ['Dom', 'Michael Lance', 'Jedd', 'Marica', 'RJ'],
+  chapters: {
+    'Manila':    ['Precious','Ariel'],
+    'Tacloban':  ['Rolf'],
+    'Iloilo':    ['Ted'],
+    'Bukidnon':  ['Zhi','Glyrhiz'],
+    'Laguna':    ['Danmel'],
+    'Pampanga':  ['Rejy Joash','Rejy'],
+    'Legazpi':   ['JP Remar Serrano','JP'],
+    'Cebu':      ['Sab', 'Sabrinah'],
+    'Davao':     ['Christian Jake Geonzon','CJ','CJ Geonzon'],
+    'Iligan':    ['Reyche'],
+  },
+  interns: {
+    'Cohort 3': ['Lady', 'Kien', 'Kenshin', 'Allyza'],
+    'Cohort 4': ['Clayton', 'Dale', 'Zendy'],
+  }
+};
+
+function getFilteredAssignees() {
+  const group   = document.getElementById('task-filter-group')?.value || '';
+  const chapter = document.getElementById('task-filter-chapter')?.value || '';
+  if (!group) return null;
+  if (group === 'hq') return TEAM.hq;
+  if (group === 'chapters') {
+    if (chapter) return TEAM.chapters[chapter] || [];
+    return Object.values(TEAM.chapters).flat();
+  }
+  if (group === 'interns') return Object.values(TEAM.interns).flat();
+  return null;
+}
+
+function applyTaskFilter() {
+  const group = document.getElementById('task-filter-group')?.value || '';
+  const chapterSelect = document.getElementById('task-filter-chapter');
+  if (chapterSelect) {
+    chapterSelect.style.display = group === 'chapters' ? 'inline-block' : 'none';
+    if (group !== 'chapters') chapterSelect.value = '';
+  }
+  renderTasks();
+}
+
+function clearTaskFilter() {
+  const g = document.getElementById('task-filter-group');
+  const c = document.getElementById('task-filter-chapter');
+  if (g) g.value = '';
+  if (c) { c.value = ''; c.style.display = 'none'; }
+  renderTasks();
+}
+  
+// ══════════════════════════════════════════════════════════════
 // TASKS
 // ══════════════════════════════════════════════════════════════
 function renderTasks() {
-  ['critical','high','medium'].forEach(prio=>{
-    const list = document.getElementById('tasks-'+prio);
-    const items = tasks[prio];
+  moveToBacklog();
 
-    // Separate active and done
-    const active = items.filter(t=>!t.done);
-    const done   = items.filter(t=>t.done);
+  const filterAssignees = getFilteredAssignees();
 
-    // Render a single task row
-function taskRow(t, i, isDone) {
-  return `<div class="task-row" id="tr-${t.id}" style="${isDone?'opacity:.5':''}">
-    <div class="task-check ${isDone?'done':''}" onclick="toggleTask('${prio}',${i})"></div>
-    <span class="task-id-badge">${h(t.id)}</span>
-    <div class="task-text ${isDone?'done':''}">${h(t.text)}</div>
-    <span class="task-assign">${h(t.assign||'—')}</span>
-    <span class="task-due ${isDue(t.due)?'overdue':''}">${t.due||''}</span>
-    <div class="task-prio ${prio}"></div>
-    <button class="task-del" onclick="deleteTask('${prio}',${i})" title="Delete task">✕</button>
-  </div>`;
-}
+  ['critical','high','medium','backlog'].forEach(prio => {
+    const list = document.getElementById('tasks-' + prio);
+    if (!list) return;
 
-    // Build active rows
-    let html = active.map((t)=>{
-      const realIdx = items.indexOf(t);
+    let items = tasks[prio] || [];
+
+    // Apply group/chapter filter
+    if (filterAssignees) {
+      items = items.filter(t =>
+        filterAssignees.some(name =>
+          (t.assign || '').toLowerCase().includes(name.toLowerCase().split(' ')[0]) ||
+          name.toLowerCase().includes((t.assign || '').toLowerCase())
+        )
+      );
+    }
+
+    const active = items.filter(t => !t.done);
+    const done   = items.filter(t => t.done);
+
+    function taskRow(t, realIdx, isDone) {
+      const overdue  = isOverdue(t);
+      const isBacklog = prio === 'backlog';
+      const prioClass = isBacklog ? (t.backlogFrom || 'medium') : prio;
+      return `<div class="task-row" id="tr-${t.id}" style="${isDone ? 'opacity:.5' : ''}">
+        <div class="task-check ${isDone ? 'done' : ''}" onclick="toggleTask('${prio}',${realIdx})"></div>
+        <span class="task-id-badge">${h(t.id)}</span>
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden">
+          <div class="task-text ${isDone ? 'done' : ''}">${h(t.text)}</div>
+          ${isBacklog && t.backlogFrom ? `<span style="font-family:var(--mono);font-size:10px;color:var(--org);margin-top:1px">↑ was ${t.backlogFrom.toUpperCase()}</span>` : ''}
+        </div>
+        <span class="task-assign">${h(t.assign || '—')}</span>
+        <span class="task-due ${overdue && !isDone ? 'overdue' : ''}">${t.due || ''}</span>
+        <div class="task-prio ${prioClass}"></div>
+        <button class="task-del" onclick="deleteTask('${prio}',${realIdx})" title="Delete task">✕</button>
+      </div>`;
+    }
+
+    // Active rows — use index in the FULL (unfiltered) array for toggle/delete to work correctly
+    let html = active.map(t => {
+      const realIdx = (tasks[prio] || []).indexOf(t);
       return taskRow(t, realIdx, false);
     }).join('');
 
-    // Build done section — only show for 'medium' (This Week) as collapsible
-    // For critical and high, show inline collapsed by default
-    if(done.length > 0) {
-      const sectionId = 'done-items-'+prio;
-      const labelId   = 'done-label-'+prio;
-      // medium starts open, others start closed
+    // Done section
+    if (done.length > 0) {
+      const sectionId = 'done-items-' + prio;
+      const labelId   = 'done-label-' + prio;
       const startOpen = prio === 'medium';
       html += `
         <div class="done-section">
-          <div class="done-section-label ${startOpen?'open':''}" id="${labelId}"
-               onclick="toggleDoneSection('${prio}')">
+          <div class="done-section-label ${startOpen ? 'open' : ''}" id="${labelId}" onclick="toggleDoneSection('${prio}')">
             DONE (${done.length})
           </div>
-          <div class="done-items ${startOpen?'open':''}" id="${sectionId}">
-            ${done.map((t)=>{
-              const realIdx = items.indexOf(t);
+          <div class="done-items ${startOpen ? 'open' : ''}" id="${sectionId}">
+            ${done.map(t => {
+              const realIdx = (tasks[prio] || []).indexOf(t);
               return taskRow(t, realIdx, true);
             }).join('')}
           </div>
         </div>`;
     }
 
+    // Empty state
+    if (active.length === 0 && done.length === 0) {
+      html = `<div style="padding:16px 20px;font-family:var(--mono);font-size:12px;color:var(--dim)">
+        ${filterAssignees
+          ? `No tasks for selected filter`
+          : prio === 'backlog'
+            ? '✅ No overdue tasks in backlog'
+            : 'No tasks'}
+      </div>`;
+    }
+
     list.innerHTML = html;
 
-    // Fix progress pill ID (critical→crit, medium→med)
-    const progId = 'tasks-' + prio.replace('critical','crit').replace('medium','med') + '-prog';
-    const progEl = document.getElementById(progId);
-    if(progEl) progEl.textContent = `${done.length}/${items.length}`;
+    // Progress pill — always shows totals from full unfiltered array
+    const allItems = tasks[prio] || [];
+    const allDone  = allItems.filter(t => t.done).length;
+    const progKey  = prio.replace('critical','crit').replace('medium','med');
+    const progEl   = document.getElementById('tasks-' + progKey + '-prog');
+    if (progEl) progEl.textContent = `${allDone}/${allItems.length}`;
   });
+
   updateNavBadges();
 }
 
@@ -958,7 +1073,10 @@ function addTask(prio, input) {
   const text = input.value.trim();
   if(!text) return;
   const id = 't'+Date.now();
-  tasks[prio].push({id,text,assign:'Jedd',due:'',done:false});
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + 7);
+  const due = dueDate.toLocaleDateString('en-PH',{month:'short',day:'numeric'});
+  tasks[prio].push({id,text,assign:'Jedd',due,done:false,created:new Date().toISOString()});
   input.value='';
   saveState(); renderTasks();
 }
@@ -984,8 +1102,39 @@ function clearDone(section) {
 
 function isDue(due) {
   if(!due) return false;
-  // simple check — if "Mar 28" and today is after, highlight
-  return false; // simplified
+  try {
+    const parts = due.split(' ');
+    if(parts.length < 2) return false;
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const month = months[parts[0]];
+    const day = parseInt(parts[1]);
+    if(isNaN(month) || isNaN(day)) return false;
+    const year = new Date().getFullYear();
+    const dueDate = new Date(year, month, day);
+    return dueDate < new Date();
+  } catch { return false; }
+}
+
+function moveToBacklog() {
+  let moved = false;
+  ['critical','high','medium'].forEach(prio => {
+    const toMove = tasks[prio].filter(t => !t.done && isOverdue(t));
+    if(toMove.length) {
+      toMove.forEach(t => {
+        t.backlogFrom = prio; // remember original priority
+        t.movedToBacklog = new Date().toISOString();
+        tasks.backlog.push(t);
+      });
+      tasks[prio] = tasks[prio].filter(t => !toMove.includes(t));
+      moved = true;
+    }
+  });
+  if(moved) saveState();
+  return moved;
+}
+
+function isOverdue(task) {
+  return !task.done && isDue(task.due);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1447,6 +1596,7 @@ window.addEventListener('load', async ()=>{
     document.getElementById('app-shell').style.display='grid';
     await loadTgCfg();    // ← await so token loads before any Telegram action
     await loadFromServer();
+    moveToBacklog();
     startAutoPoll();
   } else {
     document.getElementById('pw-input').focus();
