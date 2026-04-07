@@ -824,7 +824,7 @@ async function loadFromServer() {
     const [t, r, c, b] = await Promise.all([
       tasksRes.json(), risksRes.json(), chaptersRes.json(), budgetRes.json()
     ]);
-    if (t.data) tasks    = t.data;
+    if (t.data) { tasks = t.data; if (!tasks.backlog) tasks.backlog = []; }
     if (r.data) risks    = r.data;
     if (c.data) chapters = c.data;
     if (b.data) budget   = b.data;
