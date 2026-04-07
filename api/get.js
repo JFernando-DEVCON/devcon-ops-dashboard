@@ -34,7 +34,10 @@ export default async function handler(req, res) {
         try { parsed = JSON.parse(parsed); } catch { break; }
       }
     }
-
+    // Ensure backlog array always exists on tasks
+    if (key === 'tasks' && parsed && typeof parsed === 'object') {
+      if (!parsed.backlog) parsed.backlog = [];
+    }
     return res.status(200).json({ data: parsed });
   } catch (err) {
     return res.status(500).json({ error: err.message });
