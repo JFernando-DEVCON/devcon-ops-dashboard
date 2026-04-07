@@ -11,7 +11,9 @@ export default async function handler(req, res) {
     ];
     if (budget) ops.push(kvSet('budget', budget, KV_REST_API_URL, KV_REST_API_TOKEN));
     await Promise.all(ops);
-    return res.status(200).json({ ok: true });
+    console.log('✅ Sync complete at', new Date().toISOString());
+    return res.status(200).json({ ok: true, synced_at: new Date().toISOString() });
+    return res.status(500).json({ ok: false, error: err.message, stack: err.stack });
   } catch (err) {
     console.error('Sync error:', err);
     return res.status(500).json({ ok: false, error: err.message });
