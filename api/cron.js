@@ -1,270 +1,205 @@
-export default async function handler(req, res) {
-  const authHeader = req.headers['authorization'];
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+const KV_URL   = process.env.KV_REST_API_URL;
+const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
+const CRON_SECRET = process.env.CRON_SECRET;
 
-  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
-  const KV_URL    = process.env.KV_REST_API_URL;
-  const KV_TOKEN  = process.env.KV_REST_API_TOKEN;
-
+async function kvGet(key) {
   try {
-    const [rawTasks, rawRisks, rawChapters] = await Promise.all([
-      kvGet('tasks',    KV_URL, KV_TOKEN),
-      kvGet('risks',    KV_URL, KV_TOKEN),
-      kvGet('chapters', KV_URL, KV_TOKEN),
-    ]);
-
-    console.log('Raw tasks type:', typeof rawTasks);
-    console.log('Raw tasks:', JSON.stringify(rawTasks)?.slice(0, 200));
-
-    const tasks    = typeof rawTasks    === 'string' ? JSON.parse(rawTasks)    : rawTasks;
-    const risks    = typeof rawRisks    === 'string' ? JSON.parse(rawRisks)    : rawRisks;
-    const chapters = typeof rawChapters === 'string' ? JSON.parse(rawChapters) : rawChapters;
-
-    if (!tasks || !risks || !chapters) {
-      return res.status(500).json({
-        ok: false,
-        error: 'No dashboard data in Upstash. Open dashboard and make a change to sync.'
-      });
-    }
-
-    if (!tasks.critical || !tasks.high || !tasks.medium) {
-      return res.status(500).json({
-        ok: false,
-        error: 'Invalid tasks structure',
-        received: JSON.stringify(tasks).slice(0, 300)
-      });
-    }
-
-    const now           = new Date();
-    const days          = Math.ceil((new Date('2026-06-30') - now) / 864e5);
-    const criticalOpen  = tasks.critical.filter(t => !t.done);
-    const highOpen      = tasks.high.filter(t => !t.done);
-    const mediumOpen    = tasks.medium.filter(t => !t.done);
-    const allOpenRisks  = risks.filter(r => r.status === 'open');
-    const criticalRisks = risks.filter(r => r.status === 'open' && r.sev === 'critical');
-    const highRisks     = risks.filter(r => r.status === 'open' && r.sev === 'high');
-    const doneCamps     = chapters.filter(c => c.status === 'done').length;
-    const upcomingCamps = chapters.filter(c => c.status !== 'done');
-
-    const dateStr = now.toLocaleDateString('en-PH', {
-      weekday: 'long', year: 'numeric',
-      month: 'long', day: 'numeric',
-      timeZone: 'Asia/Manila'
-    });
-
-    // Finance keywords for filtering
-    const financeKeywords = ['bir', 'liquidat', 'reimburs', 'invoice', 'budget', 'vat', 'payment', 'fund', '₱', 'peso', 'petty', 'cash', 'grant', 'sui'];
-
-    const isFinanceTask = t => financeKeywords.some(k => t.text.toLowerCase().includes(k));
-    const isOpsTask     = t => !isFinanceTask(t);
-
-    const financeCritical = criticalOpen.filter(isFinanceTask);
-    const financeHigh     = highOpen.filter(isFinanceTask);
-    const opsCritical     = criticalOpen.filter(isOpsTask);
-    const opsHigh         = highOpen.filter(isOpsTask);
-    const opsTotal        = opsCritical.length + opsHigh.length + mediumOpen.length;
-    const financeTotal    = financeCritical.length + financeHigh.length;
-
-    // ─────────────────────────────────────────
-    // MESSAGE 1 — PROGRAM OPS DSU
-    // KPI + Camps + Non-finance tasks
-    // ─────────────────────────────────────────
-    let msgMain = `📝 <b>DEVCON OPS — DAILY DSU</b>\n${dateStr}\n\n`;
-
-    msgMain += `📊 <b>KPI SNAPSHOT</b>\n`;
-    msgMain += `Code Camps: <b>${doneCamps}/5</b> completed\n`;
-    msgMain += `Days to Q2 deadline: <b>${days} days</b>\n`;
-    msgMain += `Open Risks: <b>${allOpenRisks.length}</b>\n\n`;
-
-    if (upcomingCamps.length) {
-      msgMain += `📅 <b>UPCOMING CAMPS</b>\n`;
-      upcomingCamps.forEach(c => {
-        const icon = c.status === 'done'    ? '✅' :
-                     c.status === 'atrisk'  ? '⚠️' :
-                     c.status === 'ontrack' ? '🟢' : '📌';
-        msgMain += `${icon} <b>${c.name}</b> — ${c.date}\n`;
-        msgMain += `   📍 ${c.venue} · 👤 ${c.lead}\n`;
-      });
-      msgMain += '\n';
-    }
-
-    if (criticalRisks.length) {
-      msgMain += `🚨 <b>CRITICAL — NEEDS APPROVAL</b>\n`;
-      criticalRisks.forEach(r => msgMain += `🔴 <b>${r.title}</b>\n   → ${r.action}\n`);
-      msgMain += '\n';
-    }
-
-    if (highRisks.length) {
-      msgMain += `⚠️ <b>HIGH RISKS</b>\n`;
-      highRisks.slice(0, 3).forEach(r => msgMain += `🟠 ${r.title}\n   → ${r.action}\n`);
-      msgMain += '\n';
-    }
-
-    if (opsTotal > 0) {
-      msgMain += `✅ <b>OPEN TASKS — PROGRAM OPS (${opsTotal} active)</b>\n`;
-      if (opsCritical.length) {
-        msgMain += `<b>🔴 Critical:</b>\n`;
-        opsCritical.forEach(t => msgMain += `• ${t.text} <i>(${t.assign})</i>\n`);
-      }
-      if (opsHigh.length) {
-        msgMain += `<b>🟠 High Priority:</b>\n`;
-        opsHigh.forEach(t => msgMain += `• ${t.text} <i>(${t.assign})</i>\n`);
-      }
-      if (mediumOpen.length) {
-        msgMain += `<b>🟡 This Week:</b>\n`;
-        mediumOpen.forEach(t => msgMain += `• ${t.text} <i>(${t.assign})</i>\n`);
-      }
-    }
-
-    msgMain += `\n<i>DEVCON × Sui MOU · Build Beyond</i>`;
-
-    // ─────────────────────────────────────────
-    // MESSAGE 2 — FOR RESPECTIVE TEAMS
-    // Tasks grouped by assignee — easy to forward
-    // ─────────────────────────────────────────
-    const byAssignee = {};
-    [...opsCritical, ...opsHigh, ...mediumOpen].forEach(t => {
-      const name = t.assign || 'Unassigned';
-      if (!byAssignee[name]) byAssignee[name] = [];
-      byAssignee[name].push({ ...t, _prio: opsCritical.includes(t) ? 'critical' : opsHigh.includes(t) ? 'high' : 'medium' });
-    });
-
-    let msgTeams = `📌 <b>FOR RESPECTIVE TEAMS — ACTION NEEDED</b>\n${dateStr}\n\n`;
-
-    if (Object.keys(byAssignee).length > 0) {
-      Object.entries(byAssignee).forEach(([name, taskList]) => {
-        msgTeams += `👤 <b>${name}</b>\n`;
-        taskList.forEach(t => {
-          const icon = t._prio === 'critical' ? '🔴' : t._prio === 'high' ? '🟠' : '🟡';
-          msgTeams += `  ${icon} ${t.text}\n`;
-        });
-        msgTeams += '\n';
-      });
-    } else {
-      msgTeams += `✅ No open ops tasks — great work team!\n\n`;
-    }
-
-    msgTeams += `<i>Please update status in the ops dashboard or reply here ✅</i>`;
-
-    // ─────────────────────────────────────────
-    // MESSAGE 3 — FINANCE OPS (INTERNAL)
-    // Sui Grant + BIR + Reimbursements only
-    // ─────────────────────────────────────────
-    let msgFinance = `🔐 <b>DEVCON FINANCE OPS — INTERNAL</b>\n${dateStr}\n\n`;
-
-    msgFinance += `💰 <b>SUI GRANT STATUS</b>\n`;
-    msgFinance += `Grant: ✅ PAID ₱1,120,000\n`;
-    msgFinance += `Total Spent: ~₱460,937\n`;
-    msgFinance += `Remaining: ~₱539,063\n\n`;
-
-    msgFinance += `🏦 <b>PETTY CASH / REIMBURSEMENTS</b>\n`;
-    msgFinance += `• Dom umbrella — <b>₱8,239.92 PENDING</b> (Shopee, personal card)\n`;
-    msgFinance += `• Bukidnon ₱10k seed fund — ✅ RESOLVED\n`;
-    msgFinance += `• Bukidnon ₱5k additional — ✅ RESOLVED\n\n`;
-
-    if (financeTotal > 0) {
-      msgFinance += `📋 <b>FINANCE ACTION ITEMS (${financeTotal} open)</b>\n`;
-      if (financeCritical.length) {
-        msgFinance += `<b>🔴 Critical:</b>\n`;
-        financeCritical.forEach(t => msgFinance += `• ${t.text} <i>(${t.assign})</i>\n`);
-        msgFinance += '\n';
-      }
-      if (financeHigh.length) {
-        msgFinance += `<b>🟠 High Priority:</b>\n`;
-        financeHigh.forEach(t => msgFinance += `• ${t.text} <i>(${t.assign})</i>\n`);
-        msgFinance += '\n';
-      }
-    } else {
-      msgFinance += `📋 <b>FINANCE ACTION ITEMS</b>\n✅ No open finance tasks\n\n`;
-    }
-
-    const financeRisks = allOpenRisks.filter(r =>
-      financeKeywords.some(k =>
-        r.title.toLowerCase().includes(k) ||
-        r.action.toLowerCase().includes(k)
-      )
-    );
-
-    if (financeRisks.length) {
-      msgFinance += `⚠️ <b>FINANCE RISKS</b>\n`;
-      financeRisks.forEach(r => {
-        msgFinance += `• <b>${r.title}</b>\n`;
-        msgFinance += `  → ${r.action}\n`;
-        msgFinance += `  Owner: ${r.owner}\n\n`;
-      });
-    }
-
-    msgFinance += `<i>Internal · DEVCON HQ Finance · Confidential</i>`;
-
-    // ─────────────────────────────────────────
-    // SEND — sequential with delay
-    // ─────────────────────────────────────────
-    await tgSend(BOT_TOKEN, CHAT_ID, msgMain);
-    await delay(1500);
-    await tgSend(BOT_TOKEN, CHAT_ID, msgTeams);
-    await delay(1500);
-    await tgSend(BOT_TOKEN, CHAT_ID, msgFinance);
-
-    return res.status(200).json({ ok: true, sent: true });
-
-  } catch (err) {
-    console.error('Cron error:', err.message);
-    return res.status(500).json({ ok: false, error: err.message });
-  }
-}
-
-async function tgSend(token, chatId, text) {
-  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true
-    })
-  });
-  return r.json();
-}
-
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function kvGet(key, url, token) {
-  try {
-    const r = await fetch(`${url}/get/${key}`, {
-      headers: { Authorization: `Bearer ${token}` }
+    const r = await fetch(`${KV_URL}/get/${key}`, {
+      headers: { Authorization: `Bearer ${KV_TOKEN}` }
     });
     const data = await r.json();
-    if (!data.result) return null;
-
     let parsed = data.result;
-
     while (typeof parsed === 'string') {
       try { parsed = JSON.parse(parsed); } catch { break; }
     }
-
     if (Array.isArray(parsed)) parsed = parsed[0];
-
-    while (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch { break; }
-    }
-
-    // ← KEY FIX: unwrap { value: "..." } wrapper
     if (parsed && typeof parsed === 'object' && 'value' in parsed && Object.keys(parsed).length === 1) {
       parsed = parsed.value;
       while (typeof parsed === 'string') {
         try { parsed = JSON.parse(parsed); } catch { break; }
       }
     }
-
     return parsed;
-  } catch (err) {
-    console.error(`kvGet error for key "${key}":`, err.message);
-    return null;
+  } catch { return null; }
+}
+
+async function sendTg(text) {
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: CHAT_ID,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true
+    })
+  });
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+const FINANCE_KEYWORDS = [
+  'bir','liquidat','reimburs','invoice','budget','vat','payment',
+  'fund','₱','peso','petty','cash','grant','sui'
+];
+
+function isFinance(text) {
+  return FINANCE_KEYWORDS.some(kw => text.toLowerCase().includes(kw));
+}
+
+export default async function handler(req, res) {
+  const auth = req.headers.authorization || '';
+  if (auth !== `Bearer ${CRON_SECRET}`) return res.status(401).json({ error: 'Unauthorized' });
+
+  const [tasks, risks, chapters, budget] = await Promise.all([
+    kvGet('tasks'), kvGet('risks'), kvGet('chapters'), kvGet('budget')
+  ]);
+
+  if (!tasks || !risks || !chapters || !budget) {
+    return res.status(500).json({ error: 'Failed to load data' });
   }
+
+  if (!tasks.backlog) tasks.backlog = [];
+
+  const now      = new Date();
+  const days     = Math.ceil((new Date('2026-06-30') - now) / 864e5);
+  const dateStr  = now.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric', timeZone:'Asia/Manila' });
+  const doneCamps = chapters.filter(c => c.status === 'done').length;
+
+  const critTasks  = (tasks.critical || []).filter(t => !t.done);
+  const highTasks  = (tasks.high || []).filter(t => !t.done);
+  const medTasks   = (tasks.medium || []).filter(t => !t.done);
+  const backlog    = (tasks.backlog || []).filter(t => !t.done);
+  const openRisks  = risks.filter(r => r.status === 'open');
+  const critRisks  = openRisks.filter(r => r.sev === 'critical');
+  const highRisks  = openRisks.filter(r => r.sev === 'high');
+
+  const totalSpent = budget.filter(l => !l.vat).reduce((s, l) => s + l.spent, 0);
+  const remaining  = 1000000 - totalSpent;
+
+  // Non-finance tasks only
+  const critNonFin = critTasks.filter(t => !isFinance(t.text));
+  const highNonFin = highTasks.filter(t => !isFinance(t.text));
+  const medNonFin  = medTasks.filter(t => !isFinance(t.text));
+  const backNonFin = backlog.filter(t => !isFinance(t.text));
+
+  // Finance tasks only
+  const critFin = critTasks.filter(t => isFinance(t.text));
+  const highFin = highTasks.filter(t => isFinance(t.text));
+  const backFin = backlog.filter(t => isFinance(t.text));
+
+  // ── MESSAGE 1: Program Ops DSU ──
+  let msg1 = `📝 <b>DEVCON OPS — DAILY DSU</b>\n${dateStr}\n\n`;
+  msg1 += `📊 <b>KPI</b>\n`;
+  msg1 += `🏕 Camps: <b>${doneCamps}/5</b> · 📅 <b>${days} days</b> to Q2 · 💰 Grant ✅ PAID\n\n`;
+
+  const upcomingCamps = chapters.filter(c => c.status !== 'done');
+  if (upcomingCamps.length) {
+    msg1 += `📅 <b>UPCOMING CAMPS</b>\n`;
+    upcomingCamps.forEach(c => msg1 += `• ${c.name} — ${c.date} (${c.status.toUpperCase()})\n`);
+    msg1 += '\n';
+  }
+
+  if (critRisks.length) {
+    msg1 += `🚨 <b>CRITICAL RISKS</b>\n`;
+    critRisks.forEach(r => msg1 += `🔴 ${r.title}\n   → ${r.action}\n`);
+    msg1 += '\n';
+  }
+  if (highRisks.length) {
+    msg1 += `⚠️ <b>HIGH RISKS</b>\n`;
+    highRisks.slice(0,3).forEach(r => msg1 += `🟠 ${r.title}\n   → ${r.action}\n`);
+    msg1 += '\n';
+  }
+
+  const totalNonFin = critNonFin.length + highNonFin.length + medNonFin.length + backNonFin.length;
+  msg1 += `✅ <b>OPEN TASKS (${totalNonFin})</b>\n`;
+  if (critNonFin.length) {
+    msg1 += `🔴 Critical:\n`;
+    critNonFin.forEach(t => msg1 += `• ${t.text} <i>(${t.assign})</i>\n`);
+  }
+  if (highNonFin.length) {
+    msg1 += `🟠 High:\n`;
+    highNonFin.slice(0,4).forEach(t => msg1 += `• ${t.text} <i>(${t.assign})</i>\n`);
+  }
+  if (medNonFin.length) {
+    msg1 += `🟡 This Week:\n`;
+    medNonFin.slice(0,3).forEach(t => msg1 += `• ${t.text} <i>(${t.assign})</i>\n`);
+  }
+  if (backNonFin.length) {
+    msg1 += `📦 Backlog (overdue):\n`;
+    backNonFin.slice(0,3).forEach(t => msg1 += `• ${t.text} <i>(${t.assign})</i>\n`);
+  }
+  msg1 += `\n<i>DEVCON × Sui MOU · Build Beyond</i>`;
+
+  // ── MESSAGE 2: Per Team Tasks ──
+  const TEAM_HQ       = ['Dom', 'Michael Lance', 'Jedd', 'Marica', 'RJ'];
+  const TEAM_CHAPTERS = ['Precious','Rolf','Ted','Zhi','Danmel','Rejy Joash','JP Remar Serrano','Sab','Sabrinah','Christian Jake Geonzon','Reyche'];
+  const TEAM_INTERNS  = ['Lady','Kien','Kenshin','Allyza','Clayton','Dale','Zendy'];
+  const allPeople     = [...TEAM_HQ, ...TEAM_CHAPTERS, ...TEAM_INTERNS];
+  const allOpen       = [...critTasks, ...highTasks, ...medTasks, ...backlog];
+
+  let msg2 = `👥 <b>DEVCON OPS — TASKS BY PERSON</b>\n${dateStr}\n\n`;
+
+  allPeople.forEach(person => {
+    const myTasks = allOpen.filter(t =>
+      (t.assign || '').toLowerCase().includes(person.toLowerCase().split(' ')[0])
+    );
+    if (myTasks.length) {
+      msg2 += `👤 <b>${person}</b> (${myTasks.length})\n`;
+      myTasks.forEach(t => {
+        const prio = t.backlogFrom ? '📦' : tasks.critical.find(x => x.id === t.id) ? '🔴' : tasks.high.find(x => x.id === t.id) ? '🟠' : '🟡';
+        msg2 += `  ${prio} ${t.text}\n`;
+      });
+      msg2 += '\n';
+    }
+  });
+
+  // ── MESSAGE 3: Finance Internal ──
+  const totalFinTasks = critFin.length + highFin.length + backFin.length;
+  const finRisks = openRisks.filter(r =>
+    FINANCE_KEYWORDS.some(kw => r.title.toLowerCase().includes(kw) || r.action.toLowerCase().includes(kw))
+  );
+
+  let msg3 = `💰 <b>DEVCON OPS — FINANCE INTERNAL</b>\n${dateStr}\n\n`;
+  msg3 += `<b>Grant Status:</b> ✅ ₱1,120,000 PAID\n`;
+  msg3 += `<b>Subtotal Spent:</b> ₱${totalSpent.toLocaleString()} / ₱1,000,000\n`;
+  msg3 += `<b>Remaining:</b> ₱${remaining.toLocaleString()}\n\n`;
+
+  if (totalFinTasks > 0) {
+    msg3 += `📋 <b>FINANCE TASKS (${totalFinTasks})</b>\n`;
+    if (critFin.length) {
+      msg3 += `🔴 Critical:\n`;
+      critFin.forEach(t => msg3 += `• <code>${t.id}</code> ${t.text} <i>(${t.assign})</i>\n`);
+    }
+    if (highFin.length) {
+      msg3 += `🟠 High:\n`;
+      highFin.forEach(t => msg3 += `• <code>${t.id}</code> ${t.text} <i>(${t.assign})</i>\n`);
+    }
+    if (backFin.length) {
+      msg3 += `📦 Backlog (overdue):\n`;
+      backFin.forEach(t => msg3 += `• <code>${t.id}</code> ${t.text} <i>(${t.assign})</i>\n`);
+    }
+    msg3 += '\n';
+  }
+
+  if (finRisks.length) {
+    msg3 += `⚠️ <b>FINANCE RISKS</b>\n`;
+    finRisks.forEach(r => {
+      const icon = r.sev === 'critical' ? '🔴' : r.sev === 'high' ? '🟠' : '🟡';
+      msg3 += `${icon} ${r.title}\n   → ${r.action}\n`;
+    });
+  }
+
+  msg3 += `\n<i>Finance Internal · DEVCON HQ</i>`;
+
+  // Send all 3 messages
+  await sendTg(msg1);
+  await delay(1500);
+  await sendTg(msg2);
+  await delay(1500);
+  await sendTg(msg3);
+
+  return res.status(200).json({ ok: true, sent: 3 });
 }
