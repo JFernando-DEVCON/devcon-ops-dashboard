@@ -166,9 +166,21 @@ export default async function handler(req, res) {
   try {
 
     // ════════════════════════════════════════
+    // /chatid
+    // ════════════════════════════════════════
+    if (command === '/chatid') {
+      const chat = message.chat;
+      reply  = `📋 <b>Chat ID Info</b>\n\n`;
+      reply += `<b>Chat ID:</b> <code>${chat.id}</code>\n`;
+      reply += `<b>Type:</b> ${chat.type}\n`;
+      reply += `<b>Title:</b> ${chat.title || chat.first_name || '—'}\n\n`;
+      reply += `<i>Copy the Chat ID above and paste it into the dashboard Telegram Notify page.</i>`;
+    }
+    
+    // ════════════════════════════════════════
     // /ping
     // ════════════════════════════════════════
-    if (command === '/ping') {
+    else if (command === '/ping') {
       const now = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
       reply = `🟢 <b>DEVCON Ops Bot online</b>\n${now} PHT`;
     }
