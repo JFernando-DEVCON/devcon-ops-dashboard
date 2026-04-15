@@ -117,7 +117,7 @@ function nextTaskId(tasks) {
   const nums = all
     .map(t => parseInt((t.id || '').replace('t', '')))
     .filter(n => !isNaN(n) && n < 1000000);
-  return 't' + (nums.length > 0 ? Math.max(...nums) + 1 : 16);
+  return 't' + (nums.length > 0 ? Math.max(...nums) + 1 : 1);
 }
 
 // ── 7-DAY DUE DATE ──
