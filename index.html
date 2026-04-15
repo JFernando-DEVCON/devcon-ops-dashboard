@@ -1886,6 +1886,10 @@ function checkPw() {
     document.getElementById('pw-gate').style.display='none';
     document.getElementById('app-shell').style.display='grid';
     sessionStorage.setItem('pw_ok','1');
+    // Load server data and render after login
+    loadTgCfg().then(() => {
+      loadFromServer().then(() => startAutoPoll());
+    });
   } else {
     const box = document.querySelector('.pw-box');
     const err = document.getElementById('pw-err');
@@ -1914,13 +1918,10 @@ window.addEventListener('load', async ()=>{
     document.getElementById('pw-gate').style.display='none';
     document.getElementById('app-shell').style.display='grid';
     await loadTgCfg();
-    await loadFromServer(); // renders everything internally after server load
+    await loadFromServer();
     startAutoPoll();
   } else {
     document.getElementById('pw-input').focus();
-    // Render with local/seed data for the login page background (no sync)
-    renderOverview();
-    updateNavBadges();
   }
 });
 </script>
