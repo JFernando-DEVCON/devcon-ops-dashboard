@@ -2255,6 +2255,52 @@ const KD_TYPES = {
   travel:   { icon:'✈️', label:'Travel' },
 };
 
+// ── TIME RANGE PARSER ──
+function parseTimeRange(input) {
+  if (!input) return { start: '', end: '' };
+
+  function parseOnetime(s) {
+    s = s.trim().toLowerCase();
+    const match = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    if (!match) return '';
+    let hr = parseInt(match[1]);
+    const mn = parseInt(match[2] || '0');
+    if (match[3] === 'pm' && hr < 12) hr += 12;
+    if (match[3] === 'am' && hr === 12) hr = 0;
+    return `${String(hr).padStart(2,'0')}:${String(mn).padStart(2,'0')}:00`;
+  }
+
+  // Check for range separator: "2pm - 5pm", "2:00-5:00", "14:00 - 17:00"
+  const rangeSep = input.match(/^(.+?)\s*[-–—to]+\s*(.+)$/i);
+  if (rangeSep) {
+    return {
+      start: parseOnetime(rangeSep[1]),
+      end:   parseOnetime(rangeSep[2]),
+    };
+  }
+
+  return { start: parseOnetime(input), end: '' };
+}
+
+function formatTimeDisplay(isoDate, timeEnd = '') {
+  const date = new Date(isoDate);
+  const hasTime = isoDate.includes('T') && !isoDate.endsWith('T00:00:00');
+  if (!hasTime) return '';
+
+  const startStr = date.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit' });
+
+  if (timeEnd) {
+    // Build end time from same date + timeEnd
+    const [h2, m2] = timeEnd.split(':').map(Number);
+    const endDate = new Date(date);
+    endDate.setHours(h2, m2, 0, 0);
+    const endStr = endDate.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit' });
+    return `${startStr} – ${endStr}`;
+  }
+
+  return startStr;
+}
+  
 function nextDateId() {
   const nums = meetings
     .map(m => parseInt((m.id||'').replace('d','')))
@@ -2310,10 +2356,7 @@ function renderDates() {
     const date     = new Date(m.isoDate);
     const day      = date.getDate();
     const monthStr = date.toLocaleDateString('en-PH', { month:'short' });
-    const hasTime  = m.isoDate.includes('T') && !m.isoDate.endsWith('T00:00:00');
-    const timeStr  = hasTime
-      ? date.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit' })
-      : '';
+    const timeStr = formatTimeDisplay(m.isoDate, m.timeEnd || '');
     const cd       = kdCountdown(m.isoDate);
     const typeInfo = KD_TYPES[m.type] || KD_TYPES.fyi;
 
@@ -2351,17 +2394,20 @@ async function addDatePrompt() {
 
   const timeInput = await Modal.prompt('Set Time (optional)', 'Leave blank for all-day', 'e.g. 2:00 PM, 14:00, 9am', '', 'Leave blank to save as all-day event');
 
-  let timeISO = '00:00:00';
+  const timeInput = await Modal.prompt(
+    'Set Time (optional)',
+    'Leave blank for all-day',
+    'e.g. 2:00 PM, 9am-12pm, 2:00 PM - 5:00 PM',
+    '',
+    'Single time or range: "2pm", "2pm-5pm", "14:00-17:00" · Leave blank for all-day'
+  );
+
+  let timeISO  = '00:00:00';
+  let timeEnd  = '';
   if (timeInput && timeInput.trim()) {
-    const t = timeInput.trim().toLowerCase();
-    const match = t.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
-    if (match) {
-      let hr = parseInt(match[1]);
-      const mn = parseInt(match[2] || '0');
-      if (match[3] === 'pm' && hr < 12) hr += 12;
-      if (match[3] === 'am' && hr === 12) hr = 0;
-      timeISO = `${String(hr).padStart(2,'0')}:${String(mn).padStart(2,'0')}:00`;
-    }
+    const parsed2 = parseTimeRange(timeInput.trim());
+    timeISO = parsed2.start || '00:00:00';
+    timeEnd = parsed2.end   || '';
   }
 
   const parsed = parseFlexibleDate(normalized);
@@ -2374,10 +2420,11 @@ async function addDatePrompt() {
 
   const notes = await Modal.prompt('Notes (optional)', 'Any additional details?', 'e.g. link, location, who to notify...', '');
 
-  const newDate = {
+const newDate = {
     id:      nextDateId(),
     title:   title.trim(),
     isoDate,
+    timeEnd,
     type,
     notes:   (notes||'').trim(),
     addedBy: 'Dashboard',
