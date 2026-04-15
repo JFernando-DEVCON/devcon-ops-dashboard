@@ -762,11 +762,14 @@ const RISKS = [
 // ══════════════════════════════════════════════════════════════
 // STATE (session)
 // ══════════════════════════════════════════════════════════════
-let tasks    = JSON.parse(sessionStorage.getItem('tasks')||'null')    || structuredClone(TASKS); 
-  if (!tasks.backlog) tasks.backlog = [];
+// Initialize from sessionStorage first — server load happens async in loadFromServer()
+// sessionStorage is updated after every server load so it stays in sync
+let tasks    = JSON.parse(sessionStorage.getItem('tasks')||'null')    || structuredClone(TASKS);
 let risks    = JSON.parse(sessionStorage.getItem('risks')||'null')    || structuredClone(RISKS);
 let chapters = JSON.parse(sessionStorage.getItem('chapters')||'null') || structuredClone(CHAPTERS);
 let budget   = JSON.parse(sessionStorage.getItem('budget')||'null')   || structuredClone(DEFAULT_BUDGET);
+if (!tasks.backlog)   tasks.backlog   = [];
+if (!tasks.high_done) tasks.high_done = [];
 let schedActive = false, schedInterval = null;
 
 function saveState() {
