@@ -43,8 +43,8 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .nav-badge.warn{background:var(--org)}
 .nav-badge.ok{background:var(--grn);color:#0a1a12}
 .sidebar-footer{margin-top:auto;padding:14px 18px;border-top:1px solid var(--bdr)}
-.clock-box{font-family:var(--mono);font-size:12px;color:var(--sub)}
-.clock-val{font-size:24px;color:var(--sub);letter-spacing:2px;font-weight:500}
+.clock-box{font-family:var(--mono);font-size:13px;color:var(--sub)}
+.clock-val{font-size:28px;color:var(--txt);letter-spacing:2px;font-weight:500}
 
 /* ── Main ── */
 .main{overflow-y:auto;min-height:100vh}
@@ -419,11 +419,11 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
 <div class="sidebar-footer">
   <div class="clock-box">
-    <div style="font-size:9px;letter-spacing:1px;margin-bottom:2px">LOCAL TIME</div>
+    <div style="font-size:11px;letter-spacing:1px;margin-bottom:4px;color:var(--sub)">LOCAL TIME</div>
     <div class="clock-val" id="clock">--:--:--</div>
   </div>
-  <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:6px" id="date-lbl"></div>
-  <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">Q2 Deadline: Jun 30</div>
+  <div style="font-family:var(--mono);font-size:11px;color:var(--sub);margin-top:6px" id="date-lbl"></div>
+  <div style="font-family:var(--mono);font-size:11px;color:var(--sub);margin-top:2px">Q2 Deadline: Jun 30</div>
   <button onclick="manualRefresh()" style="margin-top:10px;width:100%;background:transparent;border:1px solid var(--bdr);border-radius:6px;padding:6px;font-family:var(--mono);font-size:9px;color:var(--dim);cursor:pointer;letter-spacing:1px;transition:all .15s" onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'">🔄 SYNC DASHBOARD</button>
   <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:4px;text-align:center" id="sync-status"></div>
 </div>
@@ -1034,6 +1034,21 @@ function isDue(due) {
   } catch { return false; }
 }
 
+function formatDue(dateStr) {
+  if (!dateStr || dateStr === 'TBC') return dateStr;
+  try {
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const parts  = dateStr.split(' ');
+    if (parts.length < 2) return dateStr;
+    const month = months[parts[0]];
+    const day   = parseInt(parts[1]);
+    if (isNaN(month) || isNaN(day)) return dateStr;
+    const d    = new Date(new Date().getFullYear(), month, day);
+    const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+    return `${days[d.getDay()]} ${parts[0]} ${day}`;
+  } catch { return dateStr; }
+}
+
 function isOverdue(task) {
   return !task.done && isDue(task.due);
 }
@@ -1092,7 +1107,7 @@ function taskRow(t, realIdx, isDone) {
   const prioClass = isBacklog ? (t.backlogFrom || 'medium') : prio;
 
   const dueLabel = t.due
-    ? `<span class="task-due ${overdue && !isDone ? 'overdue' : ''}">${h(t.due)}</span>`
+    ? `<span class="task-due ${overdue && !isDone ? 'overdue' : ''}">${h(formatDue(t.due))}</span>`
     : `<span style="font-family:var(--mono);font-size:10px;color:var(--dim)">no due</span>`;
 
   return `<div class="task-row" id="tr-${t.id}" style="${isDone ? 'opacity:.5' : ''}">
@@ -1211,26 +1226,51 @@ function addTask(prio, input) {
   ].join('\n');
  
   // Step 1 — Assignee (required, no default)
+// Build a clean numbered list for easier selection
+  const allMembersList = [
+    ...TEAM.hq,
+    ...Object.values(TEAM.chapters).map(names => names[0]),
+    ...Object.values(TEAM.interns).flat()
+  ];
+  const numberedList = allMembersList
+    .map((name, i) => `${i + 1}. ${name}`)
+    .join('\n');
+
   let assign = '';
   while (!assign) {
     const inputAssign = prompt(
-      `Assign this task to:\n\n"${text}"\n\n${memberList}\n\nType a name (required — no default):`,
+      `Who is responsible for this task?\n\n"${text}"\n\n── TEAM ──\n${numberedList}\n\nType a name or number:`,
       ''
     );
-    if (inputAssign === null) return; // user cancelled — abort
-    assign = inputAssign.trim();
-    if (!assign) {
-      alert('An assignee is required. Please enter who is responsible for this task.');
+    if (inputAssign === null) return;
+    const trimmed = inputAssign.trim();
+    if (!trimmed) {
+      alert('An assignee is required.');
+      continue;
+    }
+    // Allow number selection
+    const num = parseInt(trimmed);
+    if (!isNaN(num) && num >= 1 && num <= allMembersList.length) {
+      assign = allMembersList[num - 1];
+    } else {
+      assign = trimmed;
     }
   }
  
-  // Step 2 — Due date (default 7 days, adjustable)
+  // Step 2 — Due date (default 3 days, adjustable)
   const defaultDue = new Date();
-  defaultDue.setDate(defaultDue.getDate() + 7);
+  let daysAdded = 0;
+  let current = new Date(defaultDue);
+  while (daysAdded < 3) {
+    current.setDate(current.getDate() + 1);
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) daysAdded++; // skip Sunday (0) and Saturday (6)
+  }
+  defaultDue.setTime(current.getTime());
   const defaultDueStr = defaultDue.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
  
   const inputDue = prompt(
-    `Set due date for this task:\n\n"${text}"\nAssigned to: ${assign}\n\nDefault: ${defaultDueStr} (7 days from today)\nEnter a date (e.g. Apr 21, May 6) or leave blank to use default:`,
+    `Set due date for this task:\n\n"${text}"\nAssigned to: ${assign}\n\nDefault: ${defaultDueStr} (3 business days from today)\nEnter a date (e.g. Apr 21, May 6) or leave blank to use default:`,
     defaultDueStr
   );
   if (inputDue === null) return; // user cancelled — abort
@@ -1358,15 +1398,30 @@ function editTaskAssign(prio, idx) {
     'Interns C4: ' + TEAM.interns['Cohort 4'].join(', '),
   ].join('\n');
 
+const allMembersList = [
+    ...TEAM.hq,
+    ...Object.values(TEAM.chapters).map(names => names[0]),
+    ...Object.values(TEAM.interns).flat()
+  ];
+  const numberedList = allMembersList
+    .map((name, i) => `${i + 1}. ${name}`)
+    .join('\n');
+
   let newAssign = '';
   while (!newAssign) {
     const input = prompt(
-      `Reassign task:\n"${task.text}"\n\nCurrent: ${task.assign || '—'}\n\n${memberList}\n\nEnter new assignee (required):`,
+      `Reassign task:\n"${task.text}"\n\nCurrent: ${task.assign || '—'}\n\n── TEAM ──\n${numberedList}\n\nType a name or number:`,
       task.assign || ''
     );
     if (input === null) return;
-    newAssign = input.trim();
-    if (!newAssign) alert('An assignee is required.');
+    const trimmed = input.trim();
+    if (!trimmed) { alert('An assignee is required.'); continue; }
+    const num = parseInt(trimmed);
+    if (!isNaN(num) && num >= 1 && num <= allMembersList.length) {
+      newAssign = allMembersList[num - 1];
+    } else {
+      newAssign = trimmed;
+    }
   }
 
   task.assign = newAssign;
