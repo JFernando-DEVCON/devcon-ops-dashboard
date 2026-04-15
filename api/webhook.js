@@ -60,15 +60,20 @@ async function kvSet(key, value, url, token) {
 }
 
 // ── BOT LOGGER ──
+const MAX_LOGS = 100;
+
 async function logToKV(level, command, user, message) {
   try {
-    await fetch(`${process.env.VERCEL_URL
-      ? 'https://' + process.env.VERCEL_URL
-      : 'http://localhost:3000'}/api/logs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ level, command, user, message })
+    const logs = await kvGetParsed('bot_logs', KV_URL, KV_TOKEN) || [];
+    logs.unshift({
+      ts:      new Date().toISOString(),
+      level:   level   || 'info',
+      command: command || '—',
+      user:    user    || '—',
+      message: message || '—',
     });
+    if (logs.length > MAX_LOGS) logs.splice(MAX_LOGS);
+    await kvSet('bot_logs', logs, KV_URL, KV_TOKEN);
   } catch (e) {
     console.warn('⚠ Log write failed:', e.message);
   }
