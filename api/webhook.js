@@ -811,11 +811,12 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
           system: `Extract key date details from natural language for a Filipino ops team.
 Return ONLY valid JSON, no markdown, no backticks.
 Current date: ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-Return exactly: {"title":"clean title","date":"Mon DD","time":"HH:MM or empty","type":"meeting|deadline|event|fyi|travel","notes":"optional notes or empty"}
+Return exactly: {"title":"clean title","date":"Mon DD","time":"HH:MM or empty","timeEnd":"HH:MM or empty","type":"meeting|deadline|event|fyi|travel","notes":"optional notes or empty"}
 Rules:
 - title: clean short description
 - date: format as "Apr 21" — infer from context
-- time: 24h format like "14:00", empty string if not mentioned
+- time: start time in 24h format like "14:00", empty string if not mentioned
+- timeEnd: end time in 24h format like "17:00" if a range is mentioned (e.g. "2pm-5pm", "2:00-5:00"), empty string if no end time
 - type: meeting=call/sync/meet, deadline=due/submit/report, event=camp/summit/launch, fyi=reminder/note/awareness, travel=flight/travel/trip
 - notes: any extra context, empty string if none`,
           messages: [{ role: 'user', content: query }]
@@ -844,6 +845,7 @@ Rules:
             id:      newId,
             title:   parsed.title,
             isoDate,
+            timeEnd: parsed.timeEnd || '',
             type:    parsed.type || 'event',
             notes:   parsed.notes || '',
             addedBy: senderName,
@@ -860,7 +862,12 @@ Rules:
 
           reply  = `${icon} <b>Key date added!</b>\n\n`;
           reply += `📋 ${newDate.title}\n`;
-          reply += `📅 ${displayDate}${parsed.time ? ' · 🕐 ' + parsed.time : ''}\n`;
+          const timeDisplay = parsed.time
+            ? parsed.timeEnd
+              ? `🕐 ${parsed.time} – ${parsed.timeEnd}`
+              : `🕐 ${parsed.time}`
+            : '';
+          reply += `📅 ${displayDate}${timeDisplay ? ' · ' + timeDisplay : ''}\n`;
           reply += `🏷 ${newDate.type.toUpperCase()}\n`;
           if (newDate.notes) reply += `📝 ${newDate.notes}\n`;
           reply += `🆔 <code>${newId}</code>\n\n`;
