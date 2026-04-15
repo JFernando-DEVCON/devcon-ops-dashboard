@@ -1028,23 +1028,23 @@ else if (command === '/movetask') {
   } catch (err) {
     console.error('Webhook error:', err);
     reply = `⚠️ Error: ${err.message}`;
-    // Fire log without awaiting — don't block reply
-    logToKV('error', command, senderName, err.message).catch(console.warn);
   }
 
-  // Send reply immediately — log after
-  await sendReply(reply);
-
-  // Log without blocking
-  if (isCommand) {
+  // Log first — before sending, so it's not cut off by function termination
+  if (isCommand || isMention || isPrefix || isReply) {
     const preview = reply.replace(/<[^>]+>/g, '').slice(0, 120);
-    logToKV(
-      reply.startsWith('⚠️ Error:') ? 'error' : reply.includes('❓') ? 'warn' : 'ok',
-      command,
-      senderName,
-      preview
-    ).catch(console.warn);
+    try {
+      await logToKV(
+        reply.startsWith('⚠️ Error:') ? 'error' : reply.includes('❓') ? 'warn' : 'ok',
+        command || (isMention ? '@mention' : isPrefix ? 'bot:' : 'reply'),
+        senderName,
+        preview
+      );
+    } catch(e) {
+      console.warn('⚠ Log failed:', e.message);
+    }
   }
 
+  await sendReply(reply);
   return res.status(200).end();
 }
