@@ -888,7 +888,8 @@ async function loadFromServer() {
     console.warn('⚠ Could not load from server, using local data:', err.message);
     serverLoaded = true;
   }
-
+}
+  
 async function manualRefresh() {
   const status = document.getElementById('sync-status');
   if (status) status.textContent = '⏳ Syncing...';
