@@ -731,7 +731,55 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
     // ════════════════════════════════════════
     // /help
     // ════════════════════════════════════════
-  // ════════════════════════════════════════
+  
+    // ════════════════════════════════════════
+// /edittask [id] [new text]
+// ════════════════════════════════════════
+else if (command === '/edittask') {
+  const id      = args[0];
+  const newText = args.slice(1).join(' ').trim();
+
+  if (!id || !newText) {
+    reply  = '⚠️ Usage: <code>/edittask [id] [new task text]</code>\n\n';
+    reply += 'Example:\n';
+    reply += '• <code>/edittask t5 Collect BIR invoices from all Manila vendors by Apr 21</code>\n\n';
+    reply += '<i>To change assignee: /reassign [id] [name]</i>\n';
+    reply += '<i>To change deadline: /setdue [id] [date]</i>\n';
+    reply += '<i>To change priority: /movetask [id] [priority]</i>';
+  } else {
+    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+    if (!tasks) { reply = '⚠️ No dashboard data found.'; }
+    else {
+      if (!tasks.backlog) tasks.backlog = [];
+      let foundTask = null;
+      let foundPrio = null;
+
+      for (const prio of ['critical', 'high', 'medium', 'backlog']) {
+        const t = (tasks[prio] || []).find(t => t.id === id);
+        if (t) { foundTask = t; foundPrio = prio; break; }
+      }
+
+      if (!foundTask) {
+        reply = `⚠️ Task <code>${id}</code> not found.`;
+      } else {
+        const oldText    = foundTask.text;
+        foundTask.text   = newText;
+        foundTask.edited = new Date().toISOString();
+
+        await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+
+        reply  = `✏️ <b>Task updated!</b>\n\n`;
+        reply += `🆔 <code>${id}</code>\n\n`;
+        reply += `<s>${oldText}</s>\n`;
+        reply += `→ ${newText}\n\n`;
+        reply += `👤 ${foundTask.assign || '—'} · 📅 ${foundTask.due || 'no due'} · ${foundPrio.toUpperCase()}\n\n`;
+        reply += `<i>Dashboard updates within 30 seconds.</i>`;
+      }
+    }
+  }
+}
+    
+    // ════════════════════════════════════════
     // /setdue [id] [date]
     // ════════════════════════════════════════
     else if (command === '/setdue') {
@@ -789,6 +837,68 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
       }
     }
 
+
+
+// ════════════════════════════════════════
+// /movetask [id] [priority]
+// ════════════════════════════════════════
+else if (command === '/movetask') {
+  const id     = args[0];
+  const target = args[1]?.toLowerCase().trim();
+  const valid  = ['critical', 'high', 'medium', 'backlog'];
+
+  if (!id || !target || !valid.includes(target)) {
+    reply  = '⚠️ Usage: <code>/movetask [id] [priority]</code>\n\n';
+    reply += 'Priorities: <code>critical</code> · <code>high</code> · <code>medium</code> · <code>backlog</code>\n\n';
+    reply += 'Examples:\n';
+    reply += '• <code>/movetask t5 critical</code>\n';
+    reply += '• <code>/movetask t12 medium</code>\n';
+    reply += '• <code>/movetask t8 backlog</code>';
+  } else {
+    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+    if (!tasks) { reply = '⚠️ No dashboard data found.'; }
+    else {
+      if (!tasks.backlog) tasks.backlog = [];
+      let foundTask = null;
+      let foundPrio = null;
+
+      for (const prio of ['critical', 'high', 'medium', 'backlog']) {
+        const t = (tasks[prio] || []).find(t => t.id === id);
+        if (t) { foundTask = t; foundPrio = prio; break; }
+      }
+
+      if (!foundTask) {
+        reply = `⚠️ Task <code>${id}</code> not found.`;
+      } else if (foundPrio === target) {
+        reply = `ℹ️ Task <code>${id}</code> is already in ${target.toUpperCase()}.`;
+      } else {
+        // Remove from current priority
+        tasks[foundPrio] = (tasks[foundPrio] || []).filter(t => t.id !== id);
+
+        // Handle backlog metadata
+        if (target === 'backlog') {
+          foundTask.backlogFrom    = foundPrio;
+          foundTask.movedToBacklog = new Date().toISOString();
+        } else {
+          delete foundTask.backlogFrom;
+          delete foundTask.movedToBacklog;
+        }
+
+        // Add to target
+        tasks[target].push(foundTask);
+        await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+
+        const icons = { critical:'🔴', high:'🟠', medium:'🟡', backlog:'📦' };
+        reply  = `${icons[target]} <b>Task moved!</b>\n\n`;
+        reply += `🆔 <code>${id}</code> ${foundTask.text}\n\n`;
+        reply += `${icons[foundPrio]} ${foundPrio.toUpperCase()} → ${icons[target]} ${target.toUpperCase()}\n`;
+        reply += `👤 ${foundTask.assign || '—'} · 📅 ${foundTask.due || 'no due'}\n\n`;
+        reply += `<i>Dashboard updates within 30 seconds.</i>`;
+      }
+    }
+  }
+}
+  
     // ════════════════════════════════════════
     // /reassign [id] [name]
     // ════════════════════════════════════════
@@ -852,6 +962,8 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
       reply += `/addtask [natural language] — add task (always include who)\n`;
       reply += `  <code>/addtask Rolf to confirm Tacloban date, high</code>\n`;
       reply += `/deltask [id] — delete · <code>/deltask t5</code>\n`;
+      reply += `/edittask [id] [new text] — edit task text · <code>/edittask t5 New description</code>\n`;
+      reply += `/movetask [id] [priority] — change priority · <code>/movetask t5 critical</code>\n`;
       reply += `/setdue [id] [date] — update deadline · <code>/setdue t1 Apr 21</code>\n`;
       reply += `  <i>Auto-restores from backlog if new date not overdue</i>\n`;
       reply += `/reassign [id] [name] — change assignee · <code>/reassign t5 Rolf</code>\n\n`;
