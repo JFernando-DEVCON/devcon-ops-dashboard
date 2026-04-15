@@ -1047,3 +1047,4 @@ else if (command === '/movetask') {
   }
 
   return res.status(200).end();
+}
