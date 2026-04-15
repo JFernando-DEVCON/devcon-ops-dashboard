@@ -770,6 +770,9 @@ let budget   = JSON.parse(sessionStorage.getItem('budget')||'null')   || structu
 let schedActive = false, schedInterval = null;
 
 function saveState() {
+  // Ensure backlog always exists before saving
+  if (!tasks.backlog) tasks.backlog = [];
+
   sessionStorage.setItem('tasks',    JSON.stringify(tasks));
   sessionStorage.setItem('risks',    JSON.stringify(risks));
   sessionStorage.setItem('chapters', JSON.stringify(chapters));
@@ -778,19 +781,31 @@ function saveState() {
 }
 
 async function syncToServer() {
+  const statusEl = document.getElementById('sync-status');
   try {
+    if (statusEl) statusEl.textContent = '⏳ Saving...';
     const r = await fetch('/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tasks, risks, chapters, budget })
     });
     const d = await r.json();
-    if (d.ok) console.log('✅ Synced to server');
-    else console.warn('⚠ Sync error:', d);
+    if (d.ok) {
+      console.log('✅ Synced to server at', new Date().toLocaleTimeString());
+      if (statusEl) {
+        statusEl.textContent = '✅ Saved ' + new Date().toLocaleTimeString();
+        setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+      }
+    } else {
+      console.warn('⚠ Sync error:', d);
+      if (statusEl) statusEl.textContent = '⚠ Sync error';
+    }
   } catch (err) {
     console.warn('⚠ Sync failed:', err.message);
+    if (statusEl) statusEl.textContent = '⚠ Offline';
   }
 }
+  
 function saveTgCfg() {
   sessionStorage.setItem('tg_cid', document.getElementById('tg-chatid').value);
   sessionStorage.setItem('sched_t', document.getElementById('sched-time').value);
@@ -824,16 +839,26 @@ async function loadFromServer() {
     const [t, r, c, b] = await Promise.all([
       tasksRes.json(), risksRes.json(), chaptersRes.json(), budgetRes.json()
     ]);
-    if (t.data) { tasks = t.data; if (!tasks.backlog) tasks.backlog = []; }
-    if (r.data) risks    = r.data;
-    if (c.data) chapters = c.data;
-    if (b.data) budget   = b.data;
+
+    // Update in-memory state from server
+    if (t.data) { tasks    = t.data; if (!tasks.backlog) tasks.backlog = []; }
+    if (r.data)   risks    = r.data;
+    if (c.data)   chapters = c.data;
+    if (b.data)   budget   = b.data;
+
+    // ── KEY FIX: sync sessionStorage to match server data ──
+    // This prevents stale sessionStorage from overwriting fresh bot writes
+    sessionStorage.setItem('tasks',    JSON.stringify(tasks));
+    sessionStorage.setItem('risks',    JSON.stringify(risks));
+    sessionStorage.setItem('chapters', JSON.stringify(chapters));
+    sessionStorage.setItem('budget',   JSON.stringify(budget));
+
     renderOverview();
     renderTasks();
     renderChapters();
     renderRisks();
     renderBudget();
-    console.log('✅ Loaded fresh data from server');
+    console.log('✅ Loaded fresh data from server at', new Date().toLocaleTimeString());
   } catch (err) {
     console.warn('⚠ Could not load from server, using local data:', err.message);
   }
@@ -1323,23 +1348,24 @@ function isDue(due) {
 function moveToBacklog() {
   let moved = false;
   ['critical','high','medium'].forEach(prio => {
-    const toMove = tasks[prio].filter(t => !t.done && isOverdue(t));
-    if(toMove.length) {
+    const toMove = (tasks[prio] || []).filter(t => !t.done && isOverdue(t));
+    if (toMove.length) {
       toMove.forEach(t => {
-        t.backlogFrom = prio; // remember original priority
-        t.movedToBacklog = new Date().toISOString();
-        tasks.backlog.push(t);
+        // Only add to backlog if not already there
+        const alreadyInBacklog = (tasks.backlog || []).some(b => b.id === t.id);
+        if (!alreadyInBacklog) {
+          t.backlogFrom    = prio;
+          t.movedToBacklog = new Date().toISOString();
+          tasks.backlog.push(t);
+          moved = true;
+        }
       });
       tasks[prio] = tasks[prio].filter(t => !toMove.includes(t));
-      moved = true;
     }
   });
-  if(moved) saveState();
+  // Only save + sync if tasks actually moved — prevents overwriting fresh bot data
+  if (moved) saveState();
   return moved;
-}
-
-function isOverdue(task) {
-  return !task.done && isDue(task.due);
 }
 
 // ══════════════════════════════════════════════════════════════
