@@ -59,6 +59,21 @@ async function kvSet(key, value, url, token) {
   return result;
 }
 
+// ── BOT LOGGER ──
+async function logToKV(level, command, user, message) {
+  try {
+    await fetch(`${process.env.VERCEL_URL
+      ? 'https://' + process.env.VERCEL_URL
+      : 'http://localhost:3000'}/api/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level, command, user, message })
+    });
+  } catch (e) {
+    console.warn('⚠ Log write failed:', e.message);
+  }
+}
+
 async function kvGetParsed(key, url, token) {
   try {
     const r = await fetch(`${url}/get/${key}`, {
@@ -169,6 +184,11 @@ export default async function handler(req, res) {
       })
     });
   }
+
+  // Extract sender name for logs
+  const senderName = message.from
+    ? (message.from.username || message.from.first_name || String(message.from.id))
+    : 'unknown';
 
   try {
 
@@ -1003,8 +1023,19 @@ else if (command === '/movetask') {
   } catch (err) {
     console.error('Webhook error:', err);
     reply = `⚠️ Error: ${err.message}`;
+    await logToKV('error', command, senderName, err.message);
+  }
+
+  // Log successful command (skip non-commands like mentions/replies)
+  if (isCommand && reply && !reply.startsWith('⚠️ Error:')) {
+    const preview = reply.replace(/<[^>]+>/g, '').slice(0, 120);
+    await logToKV(
+      reply.includes('❓') ? 'warn' : 'ok',
+      command,
+      senderName,
+      preview
+    );
   }
 
   await sendReply(reply);
   return res.status(200).end();
-}
