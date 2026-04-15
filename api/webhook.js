@@ -51,8 +51,11 @@ async function kvSet(key, value, url, token) {
     body: JSON.stringify({ value: JSON.stringify(value) })
   });
   const result = await r.json();
-  console.log(`kvSet [${key}] status:`, r.status, JSON.stringify(result));
-  if (!r.ok) throw new Error(`KV write failed for key "${key}": ${JSON.stringify(result)}`);
+  if (!r.ok) {
+    console.error(`❌ KV write failed for "${key}":`, JSON.stringify(result));
+    throw new Error(`KV write failed for "${key}": ${JSON.stringify(result)}`);
+  }
+  console.log(`✅ KV write OK: ${key}`);
   return result;
 }
 
