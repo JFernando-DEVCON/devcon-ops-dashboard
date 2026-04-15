@@ -1014,6 +1014,46 @@ function clearTaskFilter() {
   if (c) { c.value = ''; c.style.display = 'none'; }
   renderTasks();
 }
+
+// ── DATE + BACKLOG HELPERS — must be defined before renderTasks() ──
+function isDue(due) {
+  if (!due) return false;
+  try {
+    const parts = due.split(' ');
+    if (parts.length < 2) return false;
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const month = months[parts[0]];
+    const day   = parseInt(parts[1]);
+    if (isNaN(month) || isNaN(day)) return false;
+    const dueDate = new Date(new Date().getFullYear(), month, day);
+    return dueDate < new Date();
+  } catch { return false; }
+}
+
+function isOverdue(task) {
+  return !task.done && isDue(task.due);
+}
+
+function moveToBacklog() {
+  let moved = false;
+  ['critical','high','medium'].forEach(prio => {
+    const toMove = (tasks[prio] || []).filter(t => !t.done && isOverdue(t));
+    if (toMove.length) {
+      toMove.forEach(t => {
+        const alreadyInBacklog = (tasks.backlog || []).some(b => b.id === t.id);
+        if (!alreadyInBacklog) {
+          t.backlogFrom    = prio;
+          t.movedToBacklog = new Date().toISOString();
+          tasks.backlog.push(t);
+          moved = true;
+        }
+      });
+      tasks[prio] = tasks[prio].filter(t => !toMove.includes(t));
+    }
+  });
+  if (moved) saveState();
+  return moved;
+}
   
 // ══════════════════════════════════════════════════════════════
 // TASKS
@@ -1333,44 +1373,6 @@ function editTaskAssign(prio, idx) {
 function clearDone(section) {
   ['critical','high','medium'].forEach(p=>{ tasks[p]=tasks[p].filter(t=>!t.done); });
   saveState(); renderTasks();
-}
-
-function isDue(due) {
-  if(!due) return false;
-  try {
-    const parts = due.split(' ');
-    if(parts.length < 2) return false;
-    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-    const month = months[parts[0]];
-    const day = parseInt(parts[1]);
-    if(isNaN(month) || isNaN(day)) return false;
-    const year = new Date().getFullYear();
-    const dueDate = new Date(year, month, day);
-    return dueDate < new Date();
-  } catch { return false; }
-}
-
-function moveToBacklog() {
-  let moved = false;
-  ['critical','high','medium'].forEach(prio => {
-    const toMove = (tasks[prio] || []).filter(t => !t.done && isOverdue(t));
-    if (toMove.length) {
-      toMove.forEach(t => {
-        // Only add if not already in backlog
-        const alreadyInBacklog = (tasks.backlog || []).some(b => b.id === t.id);
-        if (!alreadyInBacklog) {
-          t.backlogFrom    = prio;
-          t.movedToBacklog = new Date().toISOString();
-          tasks.backlog.push(t);
-          moved = true;
-        }
-      });
-      tasks[prio] = tasks[prio].filter(t => !toMove.includes(t));
-    }
-  });
-  // Only save if tasks actually moved — prevents overwriting fresh bot data
-  if (moved) saveState();
-  return moved;
 }
 
 // ══════════════════════════════════════════════════════════════
