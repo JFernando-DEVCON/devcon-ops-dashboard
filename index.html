@@ -1892,7 +1892,9 @@ function checkPw() {
     document.getElementById('pw-input').focus();
   }
 }
+
 document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkPw(); });
+
 function h(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // Clock
@@ -1903,32 +1905,33 @@ setInterval(() => {
 const dn = new Date();
 document.getElementById('date-lbl').textContent = dn.toLocaleDateString('en-PH', {weekday:'short',month:'short',day:'numeric',year:'numeric'});
 
-// ── INIT — called once after password accepted ──
 async function initApp() {
-  // Render immediately with local/session data so UI is never blank
-  renderOverview();
-  renderTasks();
-  renderChapters();
-  renderRisks();
-  renderBudget();
-  updateNavBadges();
+  if (!tasks)           tasks    = structuredClone(TASKS);
+  if (!tasks.critical)  tasks.critical  = [];
+  if (!tasks.high)      tasks.high      = [];
+  if (!tasks.medium)    tasks.medium    = [];
+  if (!tasks.backlog)   tasks.backlog   = [];
+  if (!tasks.high_done) tasks.high_done = [];
+  if (!risks)           risks    = structuredClone(RISKS);
+  if (!chapters)        chapters = structuredClone(CHAPTERS);
+  if (!budget)          budget   = structuredClone(DEFAULT_BUDGET);
 
-  // Load bot token
-  try {
-    await loadTgCfg();
-  } catch(e) {
-    console.warn('⚠ loadTgCfg failed:', e.message);
-  }
+  try { renderOverview();  } catch(e) { console.warn('renderOverview:', e.message); }
+  try { renderTasks();     } catch(e) { console.warn('renderTasks:', e.message); }
+  try { renderChapters();  } catch(e) { console.warn('renderChapters:', e.message); }
+  try { renderRisks();     } catch(e) { console.warn('renderRisks:', e.message); }
+  try { renderBudget();    } catch(e) { console.warn('renderBudget:', e.message); }
+  try { updateNavBadges(); } catch(e) { console.warn('updateNavBadges:', e.message); }
 
-  // Load fresh data from server — updates renders when ready
+  try { await loadTgCfg(); } catch(e) { console.warn('loadTgCfg:', e.message); }
+
   try {
     await loadFromServer();
   } catch(e) {
-    console.warn('⚠ loadFromServer failed:', e.message);
-    // serverLoaded stays false — writes blocked until next successful load
+    console.warn('loadFromServer:', e.message);
+    serverLoaded = true;
   }
 
-  // Start auto-poll only after first load attempt
   startAutoPoll();
 }
 
