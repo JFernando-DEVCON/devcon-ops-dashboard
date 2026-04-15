@@ -431,6 +431,35 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .log-msg{color:var(--txt2);line-height:1.45;word-break:break-word}
 .log-user{font-family:var(--mono);font-size:10px;color:var(--sub)}
 .log-empty{padding:40px 20px;text-align:center;color:var(--dim);font-family:var(--mono);font-size:12px}
+
+/* ── Key Dates ── */
+.kd-row{display:grid;grid-template-columns:auto 1fr auto;align-items:start;gap:16px;padding:16px 20px;border-bottom:1px solid var(--bdr);transition:background .1s}
+.kd-row:last-child{border-bottom:none}
+.kd-row:hover{background:rgba(255,255,255,.02)}
+.kd-date-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:8px 14px;min-width:72px;text-align:center;flex-shrink:0}
+.kd-date-badge.today{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3)}
+.kd-date-badge.tomorrow{background:rgba(251,146,60,.1);border-color:rgba(251,146,60,.3)}
+.kd-date-badge.soon{background:rgba(245,166,35,.08);border-color:rgba(245,166,35,.2)}
+.kd-day{font-family:var(--hdg);font-size:22px;font-weight:900;line-height:1;color:var(--txt)}
+.kd-month{font-family:var(--mono);font-size:10px;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.kd-countdown{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;margin-top:4px;text-transform:uppercase}
+.kd-countdown.today{color:var(--red)}
+.kd-countdown.tomorrow{color:var(--org)}
+.kd-countdown.soon{color:var(--acc)}
+.kd-countdown.later{color:var(--sub)}
+.kd-body{min-width:0}
+.kd-title{font-size:15px;font-weight:600;color:var(--txt);margin-bottom:4px;line-height:1.3}
+.kd-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+.kd-type{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:4px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.kd-type.meeting{background:rgba(56,189,248,.1);color:var(--blu)}
+.kd-type.deadline{background:rgba(248,113,113,.1);color:var(--red)}
+.kd-type.event{background:rgba(245,166,35,.1);color:var(--acc)}
+.kd-type.fyi{background:rgba(167,139,250,.1);color:var(--pur)}
+.kd-type.travel{background:rgba(52,211,153,.1);color:var(--grn)}
+.kd-time{font-family:var(--mono);font-size:11px;color:var(--sub)}
+.kd-notes{font-size:12px;color:var(--dim);margin-top:4px;line-height:1.5}
+.kd-actions{display:flex;gap:6px;opacity:0;transition:opacity .15s;flex-shrink:0}
+.kd-row:hover .kd-actions{opacity:1}
   
 </style>
 </head>
@@ -467,6 +496,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
   <div class="nav-section" style="margin-top:8px">
     <span class="nav-label">Daily Brief</span>
+  <button class="nav-item" onclick="nav('dates')"><span class="icon">📅</span>Key Dates<span class="nav-badge ok" id="nb-dates" style="background:var(--s3);color:var(--sub)">—</span></button>
   <button class="nav-item" onclick="nav('telegram')"><span class="icon">✈️</span>Telegram Notify</button>
   <button class="nav-item" onclick="nav('logs')"><span class="icon">🔍</span>Bot Logs<span class="nav-badge ok" id="nb-logs" style="background:var(--s3);color:var(--sub)">—</span></button>
   </div>
@@ -697,6 +727,42 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   </div>
 </div>
 
+<!-- ─── KEY DATES ─── -->
+<div class="page" id="page-dates">
+  <div class="pg-header">
+    <div>
+      <div class="pg-title">Key Dates</div>
+      <div class="pg-sub">IMPORTANT DATES · MEETINGS · DEADLINES · FYI</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+      <button class="btn btn-acc btn-sm" onclick="addDatePrompt()">+ ADD DATE</button>
+    </div>
+  </div>
+
+  <div class="stat-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="stat"><div class="stat-lbl">Today</div><div class="stat-val c-red" id="kd-today">—</div><div class="stat-hint">happening today</div></div>
+    <div class="stat"><div class="stat-lbl">This Week</div><div class="stat-val c-org" id="kd-week">—</div><div class="stat-hint">next 7 days</div></div>
+    <div class="stat"><div class="stat-lbl">Upcoming</div><div class="stat-val c-acc" id="kd-upcoming">—</div><div class="stat-hint">beyond this week</div></div>
+    <div class="stat"><div class="stat-lbl">Total</div><div class="stat-val c-sub" id="kd-total">—</div><div class="stat-hint">key dates tracked</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">📅 KEY DATES</span>
+      <select id="kd-filter" class="tg-mini-input" style="width:auto;font-size:11px;padding:5px 10px" onchange="renderDates()">
+        <option value="">All Types</option>
+        <option value="meeting">📅 Meeting</option>
+        <option value="deadline">⏰ Deadline</option>
+        <option value="event">📌 Event</option>
+        <option value="fyi">💡 FYI</option>
+        <option value="travel">✈️ Travel</option>
+      </select>
+    </div>
+    <div id="dates-list"></div>
+  </div>
+</div>
+  
 <!-- ─── BOT LOGS ─── -->
 <div class="page" id="page-logs">
   <div class="pg-header">
@@ -862,6 +928,7 @@ let tasks    = JSON.parse(sessionStorage.getItem('tasks')||'null')    || structu
 let risks    = JSON.parse(sessionStorage.getItem('risks')||'null')    || structuredClone(RISKS);
 let chapters = JSON.parse(sessionStorage.getItem('chapters')||'null') || structuredClone(CHAPTERS);
 let budget   = JSON.parse(sessionStorage.getItem('budget')||'null')   || structuredClone(DEFAULT_BUDGET);
+let meetings = JSON.parse(sessionStorage.getItem('meetings')||'null') || [];
 if (!tasks.backlog)   tasks.backlog   = [];
 if (!tasks.high_done) tasks.high_done = [];
 let schedActive = false, schedInterval = null;
@@ -877,6 +944,7 @@ function saveState() {
   sessionStorage.setItem('risks',    JSON.stringify(risks));
   sessionStorage.setItem('chapters', JSON.stringify(chapters));
   sessionStorage.setItem('budget',   JSON.stringify(budget));
+  sessionStorage.setItem('meetings', JSON.stringify(meetings));
   syncToServer();
 }
 
@@ -892,7 +960,7 @@ async function syncToServer() {
     const r = await fetch('/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tasks, risks, chapters, budget })
+      body: JSON.stringify({ tasks, risks, chapters, budget, meetings })
     });
     const d = await r.json();
     if (d.ok) {
@@ -939,14 +1007,15 @@ async function loadTgCfg() {
 
 async function loadFromServer() {
   try {
-    const [tasksRes, risksRes, chaptersRes, budgetRes] = await Promise.all([
+    const [tasksRes, risksRes, chaptersRes, budgetRes, meetingsRes] = await Promise.all([
       fetch('/api/get?key=tasks'),
       fetch('/api/get?key=risks'),
       fetch('/api/get?key=chapters'),
       fetch('/api/get?key=budget'),
+      fetch('/api/get?key=meetings'),
     ]);
-    const [t, r, c, b] = await Promise.all([
-      tasksRes.json(), risksRes.json(), chaptersRes.json(), budgetRes.json()
+    const [t, r, c, b, m] = await Promise.all([
+      tasksRes.json(), risksRes.json(), chaptersRes.json(), budgetRes.json(), meetingsRes.json()
     ]);
 
     // Only update if server returned valid non-empty data
@@ -963,13 +1032,18 @@ async function loadFromServer() {
     }
     if (r.data && Array.isArray(r.data)) risks    = r.data;
     if (c.data && Array.isArray(c.data)) chapters = c.data;
-    if (b.data && Array.isArray(b.data)) budget   = b.data;
+    if (b.data && Array.isArray(b.data)) budget = b.data;
+    if (m.data && Array.isArray(m.data)) {
+      meetings = m.data;
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      meetings = meetings.filter(mtg => new Date(mtg.isoDate) > cutoff);
+    }
 
-    // Sync sessionStorage to match server — prevents stale data overwriting bot writes
     sessionStorage.setItem('tasks',    JSON.stringify(tasks));
     sessionStorage.setItem('risks',    JSON.stringify(risks));
     sessionStorage.setItem('chapters', JSON.stringify(chapters));
     sessionStorage.setItem('budget',   JSON.stringify(budget));
+    sessionStorage.setItem('meetings', JSON.stringify(meetings));
     serverLoaded = true;
     
     renderOverview();
@@ -1023,6 +1097,7 @@ if(page==='tasks')    renderTasks();
   if(page==='risks')    renderRisks();
   if(page==='overview') renderOverview();
   if(page==='logs')     loadBotLogs();
+  if(page==='dates')    renderDates();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2170,6 +2245,183 @@ async function sendKpiSnapshot(){
 }
 
 // ══════════════════════════════════════════════════════════════
+// KEY DATES
+// ══════════════════════════════════════════════════════════════
+const KD_TYPES = {
+  meeting:  { icon:'📅', label:'Meeting' },
+  deadline: { icon:'⏰', label:'Deadline' },
+  event:    { icon:'📌', label:'Event' },
+  fyi:      { icon:'💡', label:'FYI' },
+  travel:   { icon:'✈️', label:'Travel' },
+};
+
+function nextDateId() {
+  const nums = meetings
+    .map(m => parseInt((m.id||'').replace('d','')))
+    .filter(n => !isNaN(n) && n > 0);
+  return 'd' + (nums.length > 0 ? Math.max(...nums) + 1 : 1);
+}
+
+function kdCountdown(isoDate) {
+  const now   = new Date();
+  const date  = new Date(isoDate);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diff  = Math.round((dDate - today) / 864e5);
+  if (diff === 0) return { label:'TODAY',          cls:'today' };
+  if (diff === 1) return { label:'TOMORROW',       cls:'tomorrow' };
+  if (diff <= 7)  return { label:`IN ${diff} DAYS`, cls:'soon' };
+  return             { label:`IN ${diff} DAYS`, cls:'later' };
+}
+
+function renderDates() {
+  const filter = document.getElementById('kd-filter')?.value || '';
+  const sorted = [...meetings].sort((a,b) => new Date(a.isoDate) - new Date(b.isoDate));
+  const filtered = filter ? sorted.filter(m => m.type === filter) : sorted;
+
+  const todayCount    = meetings.filter(m => kdCountdown(m.isoDate).cls === 'today').length;
+  const weekCount     = meetings.filter(m => ['tomorrow','soon'].includes(kdCountdown(m.isoDate).cls)).length;
+  const upcomingCount = meetings.filter(m => kdCountdown(m.isoDate).cls === 'later').length;
+
+  const nbDates = document.getElementById('nb-dates');
+  if (nbDates) {
+    nbDates.textContent = todayCount > 0 ? todayCount : meetings.length || '—';
+    nbDates.style.background = todayCount > 0 ? 'var(--red)' : 'var(--s3)';
+    nbDates.style.color      = todayCount > 0 ? '#fff'       : 'var(--sub)';
+  }
+
+  const el = (id, val) => { const e = document.getElementById(id); if(e) e.textContent = val; };
+  el('kd-today',    todayCount    || '—');
+  el('kd-week',     weekCount     || '—');
+  el('kd-upcoming', upcomingCount || '—');
+  el('kd-total',    meetings.length || '—');
+
+  const list = document.getElementById('dates-list');
+  if (!list) return;
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--dim);font-family:var(--mono);font-size:12px;line-height:2">
+      ${filter ? 'No ' + filter + ' dates found.' : '📅 No key dates yet.<br>Click + ADD DATE or use /adddate in Telegram.'}
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(m => {
+    const date     = new Date(m.isoDate);
+    const day      = date.getDate();
+    const monthStr = date.toLocaleDateString('en-PH', { month:'short' });
+    const hasTime  = m.isoDate.includes('T') && !m.isoDate.endsWith('T00:00:00');
+    const timeStr  = hasTime
+      ? date.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit' })
+      : '';
+    const cd       = kdCountdown(m.isoDate);
+    const typeInfo = KD_TYPES[m.type] || KD_TYPES.fyi;
+
+    return `<div class="kd-row">
+      <div class="kd-date-badge ${cd.cls}">
+        <div class="kd-day">${day}</div>
+        <div class="kd-month">${monthStr}</div>
+        <div class="kd-countdown ${cd.cls}">${cd.label}</div>
+      </div>
+      <div class="kd-body">
+        <div class="kd-title">${h(m.title)}</div>
+        <div class="kd-meta">
+          <span class="kd-type ${m.type}">${typeInfo.icon} ${typeInfo.label}</span>
+          ${timeStr ? `<span class="kd-time">🕐 ${timeStr}</span>` : ''}
+          ${m.addedBy ? `<span style="font-family:var(--mono);font-size:10px;color:var(--dim)">via ${h(m.addedBy)}</span>` : ''}
+        </div>
+        ${m.notes ? `<div class="kd-notes">${h(m.notes)}</div>` : ''}
+      </div>
+      <div class="kd-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editDatePrompt('${m.id}')">✏️</button>
+        <button class="btn btn-red btn-sm" onclick="removeDatePrompt('${m.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addDatePrompt() {
+  const title = await Modal.prompt('Add Key Date', 'What is this date for?', 'e.g. Sui check-in, Q2 report due, Bukidnon camp...', '');
+  if (!title || !title.trim()) return;
+
+  const dateInput = await Modal.prompt('Set Date', h(title.trim()), 'e.g. Apr 21, May 6, Jun 30', '', 'Accepts any format: "Apr 21", "april 21", "4/21"');
+  if (!dateInput || !dateInput.trim()) return;
+  const normalized = normalizeDateInput(dateInput.trim());
+  if (!normalized) { return; }
+
+  const timeInput = await Modal.prompt('Set Time (optional)', 'Leave blank for all-day', 'e.g. 2:00 PM, 14:00, 9am', '', 'Leave blank to save as all-day event');
+
+  let timeISO = '00:00:00';
+  if (timeInput && timeInput.trim()) {
+    const t = timeInput.trim().toLowerCase();
+    const match = t.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    if (match) {
+      let hr = parseInt(match[1]);
+      const mn = parseInt(match[2] || '0');
+      if (match[3] === 'pm' && hr < 12) hr += 12;
+      if (match[3] === 'am' && hr === 12) hr = 0;
+      timeISO = `${String(hr).padStart(2,'0')}:${String(mn).padStart(2,'0')}:00`;
+    }
+  }
+
+  const parsed = parseFlexibleDate(normalized);
+  if (!parsed) return;
+  const yr = new Date().getFullYear();
+  const isoDate = `${yr}-${String(parsed.month+1).padStart(2,'0')}-${String(parsed.day).padStart(2,'0')}T${timeISO}`;
+
+  const typeChoice = await Modal.prompt('Date Type', 'What kind of date is this?', 'meeting / deadline / event / fyi / travel', 'event', 'Options: meeting · deadline · event · fyi · travel');
+  const type = Object.keys(KD_TYPES).includes((typeChoice||'').trim().toLowerCase()) ? typeChoice.trim().toLowerCase() : 'event';
+
+  const notes = await Modal.prompt('Notes (optional)', 'Any additional details?', 'e.g. link, location, who to notify...', '');
+
+  const newDate = {
+    id:      nextDateId(),
+    title:   title.trim(),
+    isoDate,
+    type,
+    notes:   (notes||'').trim(),
+    addedBy: 'Dashboard',
+    created: new Date().toISOString(),
+  };
+
+  meetings.push(newDate);
+  meetings.sort((a,b) => new Date(a.isoDate) - new Date(b.isoDate));
+  saveState();
+  renderDates();
+}
+
+async function editDatePrompt(id) {
+  const mtg = meetings.find(m => m.id === id);
+  if (!mtg) return;
+
+  const currentDateStr = new Date(mtg.isoDate).toLocaleDateString('en-PH', { month:'short', day:'numeric' });
+  const newDate = await Modal.prompt('Reschedule', h(mtg.title), 'e.g. Apr 21, May 6', currentDateStr, 'Enter new date');
+  if (!newDate || !newDate.trim()) return;
+
+  const normalized = normalizeDateInput(newDate.trim());
+  if (!normalized) return;
+  const parsed = parseFlexibleDate(normalized);
+  if (!parsed) return;
+
+  const yr = new Date().getFullYear();
+  const existingTime = mtg.isoDate.split('T')[1] || '00:00:00';
+  mtg.isoDate = `${yr}-${String(parsed.month+1).padStart(2,'0')}-${String(parsed.day).padStart(2,'0')}T${existingTime}`;
+  meetings.sort((a,b) => new Date(a.isoDate) - new Date(b.isoDate));
+  saveState();
+  renderDates();
+}
+
+async function removeDatePrompt(id) {
+  const mtg = meetings.find(m => m.id === id);
+  if (!mtg) return;
+  const ok = await Modal.confirm('Remove Key Date', `"${h(mtg.title)}"`);
+  if (!ok) return;
+  meetings = meetings.filter(m => m.id !== id);
+  saveState();
+  renderDates();
+}
+  
+// ══════════════════════════════════════════════════════════════
 // BOT LOGS
 // ══════════════════════════════════════════════════════════════
 let botLogs = [];
@@ -2336,6 +2588,7 @@ async function initApp() {
   if (!risks)           risks    = structuredClone(RISKS);
   if (!chapters)        chapters = structuredClone(CHAPTERS);
   if (!budget)          budget   = structuredClone(DEFAULT_BUDGET);
+  if (!meetings)        meetings = [];
 
   try { renderOverview();  } catch(e) { console.warn('renderOverview:', e.message); }
   try { renderTasks();     } catch(e) { console.warn('renderTasks:', e.message); }
