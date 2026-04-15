@@ -417,6 +417,21 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .modal-current{font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:12px}
 .modal-current span{color:var(--blu)}
 
+/* ── Bot Logs ── */
+.log-row{display:grid;grid-template-columns:140px 80px 100px 1fr;gap:12px;align-items:start;padding:10px 20px;border-bottom:1px solid var(--bdr);transition:background .1s;font-size:12px}
+.log-row:last-child{border-bottom:none}
+.log-row:hover{background:rgba(255,255,255,.02)}
+.log-ts{font-family:var(--mono);font-size:10px;color:var(--dim);white-space:nowrap}
+.log-level{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;text-align:center;white-space:nowrap}
+.log-level.ok{background:rgba(52,211,153,.12);color:var(--grn)}
+.log-level.error{background:rgba(248,113,113,.12);color:var(--red)}
+.log-level.warn{background:rgba(251,146,60,.12);color:var(--org)}
+.log-level.info{background:rgba(56,189,248,.08);color:var(--blu)}
+.log-cmd{font-family:var(--mono);font-size:11px;color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-msg{color:var(--txt2);line-height:1.45;word-break:break-word}
+.log-user{font-family:var(--mono);font-size:10px;color:var(--sub)}
+.log-empty{padding:40px 20px;text-align:center;color:var(--dim);font-family:var(--mono);font-size:12px}
+  
 </style>
 </head>
 <body>
@@ -452,7 +467,8 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
   <div class="nav-section" style="margin-top:8px">
     <span class="nav-label">Daily Brief</span>
-    <button class="nav-item" onclick="nav('telegram')"><span class="icon">✈️</span>Telegram Notify</button>
+  <button class="nav-item" onclick="nav('telegram')"><span class="icon">✈️</span>Telegram Notify</button>
+  <button class="nav-item" onclick="nav('logs')"><span class="icon">🔍</span>Bot Logs<span class="nav-badge ok" id="nb-logs" style="background:var(--s3);color:var(--sub)">—</span></button>
   </div>
 
 <div class="sidebar-footer">
@@ -678,6 +694,43 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   <div class="card">
     <div class="card-head"><span class="card-title">📋 SEND LOG</span></div>
     <div id="tg-log" style="padding:14px;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--sub);min-height:60px;max-height:240px;overflow-y:auto">Waiting for send actions...</div>
+  </div>
+</div>
+
+<!-- ─── BOT LOGS ─── -->
+<div class="page" id="page-logs">
+  <div class="pg-header">
+    <div>
+      <div class="pg-title">Bot Logs</div>
+      <div class="pg-sub">TELEGRAM BOT · COMMAND HISTORY · LIVE MONITOR</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--dim)" id="logs-last-updated"></span>
+      <button class="btn btn-ghost btn-sm" onclick="loadBotLogs()">🔄 REFRESH</button>
+      <button class="btn btn-red btn-sm" onclick="clearBotLogs()">🗑 CLEAR LOGS</button>
+    </div>
+  </div>
+
+  <div class="stat-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="stat"><div class="stat-lbl">Total</div><div class="stat-val c-sub" id="log-stat-total">—</div><div class="stat-hint">commands logged</div></div>
+    <div class="stat"><div class="stat-lbl">Success</div><div class="stat-val c-grn" id="log-stat-ok">—</div><div class="stat-hint">ok responses</div></div>
+    <div class="stat"><div class="stat-lbl">Errors</div><div class="stat-val c-red" id="log-stat-err">—</div><div class="stat-hint">failed commands</div></div>
+    <div class="stat"><div class="stat-lbl">Last Command</div><div class="stat-val c-acc" id="log-stat-last" style="font-size:20px">—</div><div class="stat-hint" id="log-stat-last-time">—</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">📋 COMMAND LOG</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="log-filter" class="tg-mini-input" style="width:auto;font-size:11px;padding:5px 10px" onchange="renderBotLogs()">
+          <option value="">All Commands</option>
+          <option value="ok">✅ Success only</option>
+          <option value="error">❌ Errors only</option>
+          <option value="warn">⚠️ Warnings only</option>
+        </select>
+      </div>
+    </div>
+    <div id="bot-log-list" style="font-family:var(--mono);font-size:12px;min-height:200px;max-height:600px;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -945,8 +998,13 @@ async function manualRefresh() {
 function startAutoPoll() {
   setInterval(async () => {
     await loadFromServer();
+    // Also refresh bot logs if on logs page
+    const logsPage = document.getElementById('page-logs');
+    if (logsPage && logsPage.classList.contains('active')) {
+      await loadBotLogs();
+    }
     console.log('🔄 Auto-refreshed from server');
-  }, 30000); // every 30 seconds
+  }, 30000);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -959,11 +1017,12 @@ function nav(page) {
   document.querySelectorAll('.nav-item').forEach(n=>{
     if(n.getAttribute('onclick')===`nav('${page}')`) n.classList.add('active');
   });
-  if(page==='tasks') renderTasks();
+if(page==='tasks')    renderTasks();
   if(page==='chapters') renderChapters();
-  if(page==='budget') renderBudget();
-  if(page==='risks') renderRisks();
+  if(page==='budget')   renderBudget();
+  if(page==='risks')    renderRisks();
   if(page==='overview') renderOverview();
+  if(page==='logs')     loadBotLogs();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2110,6 +2169,96 @@ async function sendKpiSnapshot(){
   catch(e){tgLog('✗ '+e.message,'err');}
 }
 
+// ══════════════════════════════════════════════════════════════
+// BOT LOGS
+// ══════════════════════════════════════════════════════════════
+let botLogs = [];
+
+async function loadBotLogs() {
+  try {
+    const r = await fetch('/api/logs');
+    const d = await r.json();
+    if (d.ok) {
+      botLogs = d.logs || [];
+      renderBotLogs();
+      document.getElementById('logs-last-updated').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+    }
+  } catch(e) {
+    console.warn('⚠ Could not load bot logs:', e.message);
+  }
+}
+
+function renderBotLogs() {
+  const filter = document.getElementById('log-filter')?.value || '';
+  const filtered = filter ? botLogs.filter(l => l.level === filter) : botLogs;
+
+  // Update stat cards
+  const total  = botLogs.length;
+  const okCount  = botLogs.filter(l => l.level === 'ok').length;
+  const errCount = botLogs.filter(l => l.level === 'error').length;
+  const last   = botLogs[0];
+
+  const statTotal = document.getElementById('log-stat-total');
+  const statOk    = document.getElementById('log-stat-ok');
+  const statErr   = document.getElementById('log-stat-err');
+  const statLast  = document.getElementById('log-stat-last');
+  const statLastT = document.getElementById('log-stat-last-time');
+  const nbLogs    = document.getElementById('nb-logs');
+
+  if (statTotal) statTotal.textContent = total;
+  if (statOk)    statOk.textContent    = okCount;
+  if (statErr)   statErr.textContent   = errCount;
+  if (statLast)  statLast.textContent  = last ? last.command : '—';
+  if (statLastT) statLastT.textContent = last
+    ? new Date(last.ts).toLocaleString('en-PH', { timeZone:'Asia/Manila', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
+    : '—';
+  if (nbLogs) {
+    nbLogs.textContent = errCount > 0 ? errCount : total;
+    nbLogs.style.background = errCount > 0 ? 'var(--red)' : 'var(--s3)';
+    nbLogs.style.color      = errCount > 0 ? '#fff'       : 'var(--sub)';
+  }
+
+  const list = document.getElementById('bot-log-list');
+  if (!list) return;
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="log-empty">
+      ${filter ? 'No ' + filter + ' logs found.' : '🤖 No bot commands logged yet.<br>Commands will appear here as the bot receives them.'}
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(l => {
+    const ts = new Date(l.ts).toLocaleString('en-PH', {
+      timeZone: 'Asia/Manila',
+      month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    return `<div class="log-row">
+      <div>
+        <div class="log-ts">${ts}</div>
+        <div class="log-user" style="margin-top:2px">@${h(l.user || '—')}</div>
+      </div>
+      <div class="log-level ${l.level || 'info'}">${(l.level||'info').toUpperCase()}</div>
+      <div class="log-cmd">${h(l.command || '—')}</div>
+      <div class="log-msg">${h(l.message || '—')}</div>
+    </div>`;
+  }).join('');
+}
+
+async function clearBotLogs() {
+  const ok = await Modal.confirm('Clear All Logs', 'This will permanently delete all bot command history.');
+  if (!ok) return;
+  try {
+    await fetch('/api/logs', { method: 'DELETE' });
+    botLogs = [];
+    renderBotLogs();
+  } catch(e) {
+    console.warn('⚠ Could not clear logs:', e.message);
+  }
+}
+  
 // ══════════════════════════════════════════════════════════════
 // SCHEDULER
 // ══════════════════════════════════════════════════════════════
