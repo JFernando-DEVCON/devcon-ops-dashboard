@@ -867,7 +867,7 @@ async function loadFromServer() {
     } else {
       console.warn('⚠ Server tasks invalid — keeping local data');
     }
-    if (t.data && Array.isArray(r.data)) risks    = r.data;
+    if (r.data && Array.isArray(r.data)) risks    = r.data;
     if (c.data && Array.isArray(c.data)) chapters = c.data;
     if (b.data && Array.isArray(b.data)) budget   = b.data;
 
@@ -886,8 +886,14 @@ async function loadFromServer() {
     console.log('✅ Loaded fresh data from server at', new Date().toLocaleTimeString());
   } catch (err) {
     console.warn('⚠ Could not load from server, using local data:', err.message);
+    // Still allow saves — better to save local state than be permanently blocked
+    serverLoaded = true;
+    renderOverview();
+    renderTasks();
+    renderChapters();
+    renderRisks();
+    renderBudget();
   }
-}
 
 async function manualRefresh() {
   const status = document.getElementById('sync-status');
@@ -1908,15 +1914,14 @@ window.addEventListener('load', async ()=>{
     document.getElementById('pw-gate').style.display='none';
     document.getElementById('app-shell').style.display='grid';
     await loadTgCfg();
-    await loadFromServer();
-    // moveToBacklog is called inside renderTasks() via loadFromServer() — no need to call again
+    await loadFromServer(); // renders everything internally after server load
     startAutoPoll();
   } else {
     document.getElementById('pw-input').focus();
+    // Render with local/seed data for the login page background (no sync)
+    renderOverview();
+    updateNavBadges();
   }
-  renderOverview();
-  renderTasks();
-  updateNavBadges();
 });
 </script>
 </body>
