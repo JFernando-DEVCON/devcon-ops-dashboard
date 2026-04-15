@@ -379,6 +379,44 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   .nav-item{font-size:10px;padding:5px 8px}
   .clock-box{display:none}
 }
+
+/* ── Custom Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(4,7,14,.85);backdrop-filter:blur(6px);z-index:9998;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;pointer-events:none}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal-box{background:var(--s1);border:1px solid var(--bdr2);border-radius:18px;padding:0;width:480px;max-width:90vw;box-shadow:0 32px 80px rgba(0,0,0,.8),0 0 0 1px rgba(245,166,35,.08);transform:translateY(16px) scale(.97);transition:transform .2s,opacity .2s;opacity:0;position:relative;overflow:hidden}
+.modal-overlay.open .modal-box{transform:translateY(0) scale(1);opacity:1}
+.modal-box::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.4}
+.modal-header{padding:22px 24px 16px;border-bottom:1px solid var(--bdr)}
+.modal-title{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);font-weight:700;margin-bottom:4px}
+.modal-subtitle{font-size:14px;color:var(--txt2);font-weight:500;line-height:1.4}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:14px 24px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--bdr)}
+.modal-input{width:100%;background:var(--s3);border:1px solid var(--bdr2);border-radius:10px;padding:12px 16px;font-family:var(--sans);font-size:15px;color:var(--txt);outline:none;transition:border-color .15s,box-shadow .15s;line-height:1.5}
+.modal-input:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(245,166,35,.1);background:var(--s4)}
+.modal-input::placeholder{color:var(--dim)}
+.modal-label{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--sub);margin-bottom:8px;display:block}
+.modal-team-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:240px;overflow-y:auto;padding-right:4px}
+.modal-team-grid::-webkit-scrollbar{width:3px}
+.modal-team-grid::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:2px}
+.modal-member-btn{background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:8px 12px;font-family:var(--sans);font-size:13px;color:var(--txt2);cursor:pointer;transition:all .12s;text-align:left;display:flex;align-items:center;gap:8px}
+.modal-member-btn:hover{background:var(--s3);border-color:var(--bdr2);color:var(--txt)}
+.modal-member-btn.selected{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.4);color:var(--acc)}
+.modal-member-num{font-family:var(--mono);font-size:10px;color:var(--dim);min-width:16px}
+.modal-prio-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.modal-prio-btn{background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:12px 16px;cursor:pointer;transition:all .12s;text-align:left}
+.modal-prio-btn:hover{background:var(--s3);border-color:var(--bdr2)}
+.modal-prio-btn.selected{border-width:1.5px}
+.modal-prio-btn[data-prio="critical"]{}.modal-prio-btn[data-prio="critical"].selected{background:rgba(248,113,113,.1);border-color:var(--red)}
+.modal-prio-btn[data-prio="high"].selected{background:rgba(251,146,60,.1);border-color:var(--org)}
+.modal-prio-btn[data-prio="medium"].selected{background:rgba(245,166,35,.1);border-color:var(--acc)}
+.modal-prio-btn[data-prio="backlog"].selected{background:rgba(122,143,168,.1);border-color:var(--sub)}
+.modal-prio-icon{font-size:16px;margin-bottom:4px}
+.modal-prio-label{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.modal-prio-desc{font-size:11px;color:var(--sub);margin-top:2px}
+.modal-hint{font-family:var(--mono);font-size:11px;color:var(--sub);margin-top:10px;line-height:1.5}
+.modal-current{font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:12px}
+.modal-current span{color:var(--blu)}
+
 </style>
 </head>
 <body>
@@ -646,6 +684,9 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 </main>
 </div><!-- end app-shell -->
 
+<!-- ── MODAL OVERLAY ── -->
+<div class="modal-overlay" id="modal-overlay"></div>  
+  
 <script>
 // ══════════════════════════════════════════════════════════════
 // DATA — seeded from project context
@@ -1013,6 +1054,209 @@ function applyTaskFilter() {
   renderTasks();
 }
 
+// ══════════════════════════════════════════════════════════════
+// CUSTOM MODAL SYSTEM — replaces all browser prompt() calls
+// ══════════════════════════════════════════════════════════════
+const Modal = {
+  _resolve: null,
+
+  _el() { return document.getElementById('modal-overlay'); },
+
+  open() {
+    const el = this._el();
+    el.classList.add('open');
+    setTimeout(() => {
+      const inp = el.querySelector('.modal-input');
+      if (inp) inp.focus();
+    }, 150);
+  },
+
+  close(val) {
+    this._el().classList.remove('open');
+    if (this._resolve) { this._resolve(val); this._resolve = null; }
+  },
+
+  _build(html) {
+    this._el().innerHTML = `<div class="modal-box">${html}</div>`;
+    // Close on overlay click
+    this._el().onclick = (e) => { if (e.target === this._el()) this.close(null); };
+    // Close on Escape
+    document.onkeydown = (e) => { if (e.key === 'Escape') this.close(null); };
+  },
+
+  // ── Text input modal ──
+  prompt(title, subtitle, placeholder, defaultVal = '', hint = '') {
+    return new Promise(resolve => {
+      this._resolve = resolve;
+      this._build(`
+        <div class="modal-header">
+          <div class="modal-title">${title}</div>
+          <div class="modal-subtitle">${subtitle}</div>
+        </div>
+        <div class="modal-body">
+          ${hint ? `<div class="modal-hint">${hint}</div>` : ''}
+          <input class="modal-input" id="modal-text-input" placeholder="${placeholder}" value="${defaultVal.replace(/"/g,'&quot;')}"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();Modal.close(document.getElementById('modal-text-input').value)}">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="Modal.close(null)">CANCEL</button>
+          <button class="btn btn-acc" onclick="Modal.close(document.getElementById('modal-text-input').value)">CONFIRM →</button>
+        </div>
+      `);
+      this.open();
+    });
+  },
+
+  // ── Assignee picker modal ──
+  pickAssignee(taskText, currentAssign = '') {
+    return new Promise(resolve => {
+      this._resolve = resolve;
+      const allMembersList = [
+        ...TEAM.hq,
+        ...Object.values(TEAM.chapters).map(names => names[0]),
+        ...Object.values(TEAM.interns).flat()
+      ];
+      const groups = [
+        { label: 'HQ / National', members: TEAM.hq },
+        { label: 'Chapter Leaders', members: Object.values(TEAM.chapters).map(n => n[0]) },
+        { label: 'Cohort 3', members: TEAM.interns['Cohort 3'] },
+        { label: 'Cohort 4', members: TEAM.interns['Cohort 4'] },
+      ];
+
+      let selectedName = currentAssign;
+      let idx = 1;
+      const memberNums = {};
+      allMembersList.forEach(n => { memberNums[n] = idx++; });
+
+      const gridHtml = groups.map(g => `
+        <div style="grid-column:1/-1;font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-top:8px;margin-bottom:2px">${g.label}</div>
+        ${g.members.map(name => `
+          <button class="modal-member-btn ${name === currentAssign ? 'selected' : ''}" id="mbtn-${name.replace(/\s/g,'_')}"
+            onclick="Modal._selectMember('${name.replace(/'/g,"\\'")}')">
+            <span class="modal-member-num">${memberNums[name]}</span>
+            <span>${name}</span>
+          </button>
+        `).join('')}
+      `).join('');
+
+      this._build(`
+        <div class="modal-header">
+          <div class="modal-title">Assign Task</div>
+          <div class="modal-subtitle" style="font-size:13px;color:var(--sub)">${taskText}</div>
+        </div>
+        <div class="modal-body">
+          ${currentAssign ? `<div class="modal-current">Currently assigned to: <span>${currentAssign}</span></div>` : ''}
+          <div class="modal-team-grid" id="modal-team-grid">${gridHtml}</div>
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <input class="modal-input" id="modal-assign-input" placeholder="Or type a name..." style="font-size:13px;padding:8px 12px"
+              oninput="Modal._filterMembers(this.value)"
+              onkeydown="if(event.key==='Enter'){Modal.close(this.value||Modal._selectedMember)}">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="Modal.close(null)">CANCEL</button>
+          <button class="btn btn-acc" id="modal-assign-confirm"
+            onclick="Modal.close(document.getElementById('modal-assign-input').value||Modal._selectedMember)"
+            ${currentAssign ? '' : 'disabled'}>ASSIGN →</button>
+        </div>
+      `);
+      this._selectedMember = currentAssign;
+      this.open();
+    });
+  },
+
+  _selectedMember: '',
+
+  _selectMember(name) {
+    this._selectedMember = name;
+    document.querySelectorAll('.modal-member-btn').forEach(b => b.classList.remove('selected'));
+    const btn = document.getElementById('mbtn-' + name.replace(/\s/g,'_'));
+    if (btn) btn.classList.add('selected');
+    const confirmBtn = document.getElementById('modal-assign-confirm');
+    if (confirmBtn) confirmBtn.removeAttribute('disabled');
+    // Scroll selected into view
+    if (btn) btn.scrollIntoView({ block: 'nearest' });
+  },
+
+  _filterMembers(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('.modal-member-btn').forEach(b => {
+      const name = b.querySelector('span:last-child')?.textContent || '';
+      b.style.display = (!q || name.toLowerCase().includes(q)) ? '' : 'none';
+    });
+    const confirmBtn = document.getElementById('modal-assign-confirm');
+    if (confirmBtn) {
+      if (query.trim() || this._selectedMember) confirmBtn.removeAttribute('disabled');
+      else confirmBtn.setAttribute('disabled', '');
+    }
+  },
+
+  // ── Priority picker modal ──
+  pickPriority(taskText, currentPrio) {
+    return new Promise(resolve => {
+      this._resolve = resolve;
+      const prios = [
+        { key:'critical', icon:'🔴', label:'Critical', desc:'Needs action now' },
+        { key:'high',     icon:'🟠', label:'High',     desc:'Important this week' },
+        { key:'medium',   icon:'🟡', label:'This Week', desc:'Normal priority' },
+        { key:'backlog',  icon:'📦', label:'Backlog',  desc:'Overdue / deferred' },
+      ];
+      const btns = prios.filter(p => p.key !== currentPrio).map(p => `
+        <button class="modal-prio-btn" data-prio="${p.key}" onclick="Modal._selectPrio('${p.key}')">
+          <div class="modal-prio-icon">${p.icon}</div>
+          <div class="modal-prio-label" style="color:${p.key==='critical'?'var(--red)':p.key==='high'?'var(--org)':p.key==='medium'?'var(--acc)':'var(--sub)'}">${p.label}</div>
+          <div class="modal-prio-desc">${p.desc}</div>
+        </button>
+      `).join('');
+      this._build(`
+        <div class="modal-header">
+          <div class="modal-title">Move Task</div>
+          <div class="modal-subtitle" style="font-size:13px;color:var(--sub)">${taskText}</div>
+          <div class="modal-current" style="margin-top:6px">Currently: <span style="text-transform:uppercase">${currentPrio}</span></div>
+        </div>
+        <div class="modal-body">
+          <div class="modal-prio-grid" id="modal-prio-grid">${btns}</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="Modal.close(null)">CANCEL</button>
+          <button class="btn btn-acc" id="modal-prio-confirm" onclick="Modal.close(Modal._selectedPrio)" disabled>MOVE →</button>
+        </div>
+      `);
+      this._selectedPrio = null;
+      this.open();
+    });
+  },
+
+  _selectedPrio: null,
+
+  _selectPrio(prio) {
+    this._selectedPrio = prio;
+    document.querySelectorAll('.modal-prio-btn').forEach(b => b.classList.remove('selected'));
+    const btn = document.querySelector(`.modal-prio-btn[data-prio="${prio}"]`);
+    if (btn) btn.classList.add('selected');
+    const confirmBtn = document.getElementById('modal-prio-confirm');
+    if (confirmBtn) confirmBtn.removeAttribute('disabled');
+  },
+
+  // ── Confirm modal ──
+  confirm(title, message) {
+    return new Promise(resolve => {
+      this._resolve = resolve;
+      this._build(`
+        <div class="modal-header">
+          <div class="modal-title">${title}</div>
+          <div class="modal-subtitle">${message}</div>
+        </div>
+        <div class="modal-footer" style="border-top:none;padding-top:20px">
+          <button class="btn btn-ghost" onclick="Modal.close(false)">CANCEL</button>
+          <button class="btn btn-red" onclick="Modal.close(true)">CONFIRM</button>
+        </div>
+      `);
+      this.open();
+    });
+  },
+};
+
 // ── SEQUENTIAL TASK ID — mirrors webhook.js logic ──
 function nextTaskId() {
   const all = [
@@ -1225,7 +1469,7 @@ function toggleTask(prio, idx) {
   saveState(); renderTasks();
 }
 
-function addTask(prio, input) {
+async function addTask(prio, input) {
   const text = input.value.trim();
   if (!text) return;
  
@@ -1253,26 +1497,8 @@ function addTask(prio, input) {
     .map((name, i) => `${i + 1}. ${name}`)
     .join('\n');
 
-  let assign = '';
-  while (!assign) {
-    const inputAssign = prompt(
-      `Who is responsible for this task?\n\n"${text}"\n\n── TEAM ──\n${numberedList}\n\nType a name or number:`,
-      ''
-    );
-    if (inputAssign === null) return;
-    const trimmed = inputAssign.trim();
-    if (!trimmed) {
-      alert('An assignee is required.');
-      continue;
-    }
-    // Allow number selection
-    const num = parseInt(trimmed);
-    if (!isNaN(num) && num >= 1 && num <= allMembersList.length) {
-      assign = allMembersList[num - 1];
-    } else {
-      assign = trimmed;
-    }
-  }
+  const assign = await Modal.pickAssignee(text, '');
+  if (!assign) return;
  
   // Step 2 — Due date (default 3 days, adjustable)
   const defaultDue = new Date();
@@ -1286,12 +1512,15 @@ function addTask(prio, input) {
   defaultDue.setTime(current.getTime());
   const defaultDueStr = defaultDue.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
  
-  const inputDue = prompt(
-    `Set due date for this task:\n\n"${text}"\nAssigned to: ${assign}\n\nDefault: ${defaultDueStr} (3 business days from today)\nEnter a date (e.g. Apr 21, May 6) or leave blank to use default:`,
-    defaultDueStr
+const inputDue = await Modal.prompt(
+    'Set Due Date',
+    `Assigned to: ${assign}`,
+    `e.g. Apr 21, May 6`,
+    defaultDueStr,
+    `Default: ${defaultDueStr} (3 business days) · Leave blank to use default`
   );
-  if (inputDue === null) return; // user cancelled — abort
-  const due = inputDue.trim() || defaultDueStr;
+  if (inputDue === null) return;
+  const due = (inputDue || '').trim() || defaultDueStr;
  
   const id = nextTaskId();
   tasks[prio].push({
@@ -1315,30 +1544,34 @@ function toggleDoneSection(prio) {
   items.classList.toggle('open');
 }
 
-function deleteTask(prio, idx) {
-  if(!confirm('Delete this task?')) return;
+async function deleteTask(prio, idx) {
+  const ok = await Modal.confirm('Delete Task', `"${tasks[prio][idx]?.text?.slice(0,60) || 'this task'}"${tasks[prio][idx]?.text?.length > 60 ? '…' : ''}`);
+  if (!ok) return;
   tasks[prio].splice(idx, 1);
   saveState(); renderTasks();
 }
 
-function editTaskDue(prio, idx) {
+async function editTaskDue(prio, idx) {
   const task = (tasks[prio] || [])[idx];
   if (!task) return;
 
   const current = task.due || 'no due date';
-  const newDue  = prompt(
-    `Update due date:\n"${task.text}"\nAssigned to: ${task.assign || '—'}\n\nCurrent due: ${current}\n\nEnter new due date (e.g. Apr 21, May 15):\nLeave blank to remove due date.`,
-    task.due || ''
+  const newDue = await Modal.prompt(
+    'Edit Due Date',
+    `${task.text.slice(0,60)}${task.text.length>60?'…':''}`,
+    'e.g. Apr 21, May 15',
+    task.due || '',
+    `Assigned to: ${task.assign || '—'} · Leave blank to remove due date`
   );
   if (newDue === null) return;
-
-  task.due = newDue.trim();
+  task.due = (newDue || '').trim();
 
   // If in backlog and new due date is no longer overdue → offer restore
   if (prio === 'backlog' && task.due && !isOverdue(task)) {
     const restorePrio = task.backlogFrom || 'medium';
-    const restore = confirm(
-      `"${task.due}" is not overdue yet.\n\nRestore this task to ${restorePrio.toUpperCase()} priority?`
+    const restore = await Modal.confirm(
+      'Restore from Backlog',
+      `"${task.due}" is not overdue. Restore to ${restorePrio.toUpperCase()} priority?`
     );
     if (restore) {
       delete task.backlogFrom;
@@ -1352,25 +1585,26 @@ function editTaskDue(prio, idx) {
   renderTasks();
 }
 
-function editTaskText(prio, idx) {
+async function editTaskText(prio, idx) {
   const task = (tasks[prio] || [])[idx];
   if (!task) return;
 
-  const newText = prompt(
-    `Edit task text:\n\nCurrent:\n"${task.text}"\n\nEnter new text:`,
+  const newText = await Modal.prompt(
+    'Edit Task',
+    'Update task description',
+    'Task description...',
     task.text
   );
   if (newText === null) return;
-  const trimmed = newText.trim();
-  if (!trimmed) { alert('Task text cannot be empty.'); return; }
+  const trimmed = (newText || '').trim();
+  if (!trimmed) return;
   if (trimmed === task.text) return;
-
   task.text = trimmed;
   saveState();
   renderTasks();
 }
 
-function moveTask(currentPrio, idx) {
+async function moveTask(currentPrio, idx) {
   const task = (tasks[currentPrio] || [])[idx];
   if (!task) return;
 
@@ -1378,17 +1612,8 @@ function moveTask(currentPrio, idx) {
     .filter(p => p !== currentPrio)
     .map(p => p.charAt(0).toUpperCase() + p.slice(1));
 
-  const choice = prompt(
-    `Move task to which priority?\n\n"${task.text}"\nCurrently in: ${currentPrio.toUpperCase()}\n\nType: critical, high, medium, or backlog`,
-    ''
-  );
-  if (!choice) return;
-  const target = choice.trim().toLowerCase();
-  if (!['critical','high','medium','backlog'].includes(target)) {
-    alert('Invalid priority. Use: critical, high, medium, or backlog');
-    return;
-  }
-  if (target === currentPrio) return;
+  const target = await Modal.pickPriority(task.text, currentPrio);
+  if (!target) return;
 
   // Move task
   tasks[currentPrio].splice(idx, 1);
@@ -1404,7 +1629,7 @@ function moveTask(currentPrio, idx) {
   renderTasks();
 }
   
-function editTaskAssign(prio, idx) {
+async function editTaskAssign(prio, idx) {
   const task = (tasks[prio] || [])[idx];
   if (!task) return;
 
@@ -1424,23 +1649,8 @@ const allMembersList = [
     .map((name, i) => `${i + 1}. ${name}`)
     .join('\n');
 
-  let newAssign = '';
-  while (!newAssign) {
-    const input = prompt(
-      `Reassign task:\n"${task.text}"\n\nCurrent: ${task.assign || '—'}\n\n── TEAM ──\n${numberedList}\n\nType a name or number:`,
-      task.assign || ''
-    );
-    if (input === null) return;
-    const trimmed = input.trim();
-    if (!trimmed) { alert('An assignee is required.'); continue; }
-    const num = parseInt(trimmed);
-    if (!isNaN(num) && num >= 1 && num <= allMembersList.length) {
-      newAssign = allMembersList[num - 1];
-    } else {
-      newAssign = trimmed;
-    }
-  }
-
+  const newAssign = await Modal.pickAssignee(task.text, task.assign || '');
+  if (!newAssign) return;
   task.assign = newAssign;
   saveState();
   renderTasks();
