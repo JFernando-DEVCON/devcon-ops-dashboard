@@ -756,6 +756,194 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
       }
     }
 
+// ════════════════════════════════════════
+    // /dates
+    // ════════════════════════════════════════
+    else if (command === '/dates') {
+      const meetings = await kvGetParsed('meetings', KV_URL, KV_TOKEN) || [];
+      const now = new Date();
+      const upcoming = meetings
+        .filter(m => new Date(m.isoDate) > new Date(now - 24*60*60*1000))
+        .sort((a, b) => new Date(a.isoDate) - new Date(b.isoDate));
+
+      if (!upcoming.length) {
+        reply = '📅 <b>KEY DATES</b>\n\nNo upcoming dates. Add one with /adddate';
+      } else {
+        reply = `📅 <b>KEY DATES (${upcoming.length})</b>\n\n`;
+        upcoming.forEach(m => {
+          const date = new Date(m.isoDate);
+          const dateStr = date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const dDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+          const diff  = Math.round((dDate - today) / 864e5);
+          const countdown = diff === 0 ? '🔴 TODAY' : diff === 1 ? '🟠 TOMORROW' : diff <= 7 ? `🟡 in ${diff} days` : `📆 in ${diff} days`;
+          const typeIcons = { meeting:'📅', deadline:'⏰', event:'📌', fyi:'💡', travel:'✈️' };
+          const icon = typeIcons[m.type] || '📅';
+          reply += `${icon} <b>${m.title}</b>\n`;
+          reply += `   ${dateStr} · ${countdown} · <code>${m.id}</code>\n`;
+          if (m.notes) reply += `   <i>${m.notes}</i>\n`;
+          reply += '\n';
+        });
+        reply += `<i>Use /adddate, /reschedule [id] [date], /removedate [id]</i>`;
+      }
+    }
+
+    // ════════════════════════════════════════
+    // /adddate [natural language]
+    // ════════════════════════════════════════
+    else if (command === '/adddate') {
+      const query = args.join(' ').trim();
+      if (!query) {
+        reply  = '⚠️ Usage: <code>/adddate [natural language]</code>\n\n';
+        reply += '<b>Examples:</b>\n';
+        reply += '• <code>/adddate Sui check-in call Apr 21 3pm, meeting</code>\n';
+        reply += '• <code>/adddate Q2 report due Jun 30, deadline</code>\n';
+        reply += '• <code>/adddate Bukidnon camp May 6, event</code>\n';
+        reply += '• <code>/adddate remind team BIR filing Apr 20, fyi</code>\n';
+        reply += '• <code>/adddate Jedd flying to Iloilo May 15, travel</code>\n\n';
+        reply += '<b>Types:</b> meeting · deadline · event · fyi · travel';
+      } else {
+        const meetings = await kvGetParsed('meetings', KV_URL, KV_TOKEN) || [];
+        const anthropic = new Anthropic({ apiKey: CLAUDE_KEY });
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 200,
+          system: `Extract key date details from natural language for a Filipino ops team.
+Return ONLY valid JSON, no markdown, no backticks.
+Current date: ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+Return exactly: {"title":"clean title","date":"Mon DD","time":"HH:MM or empty","type":"meeting|deadline|event|fyi|travel","notes":"optional notes or empty"}
+Rules:
+- title: clean short description
+- date: format as "Apr 21" — infer from context
+- time: 24h format like "14:00", empty string if not mentioned
+- type: meeting=call/sync/meet, deadline=due/submit/report, event=camp/summit/launch, fyi=reminder/note/awareness, travel=flight/travel/trip
+- notes: any extra context, empty string if none`,
+          messages: [{ role: 'user', content: query }]
+        });
+
+        try {
+          const parsed = JSON.parse(response.content[0].text.trim());
+          if (!parsed.date) throw new Error('No date detected');
+
+          // Build ISO date
+          const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+          const parts = parsed.date.split(' ');
+          const month = months[parts[0]];
+          const day   = parseInt(parts[1]);
+          if (isNaN(month) || isNaN(day)) throw new Error('Invalid date');
+
+          const yr = new Date().getFullYear();
+          const timeStr = parsed.time || '00:00:00';
+          const isoDate = `${yr}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}T${timeStr.length === 5 ? timeStr + ':00' : timeStr || '00:00:00'}`;
+
+          // Generate ID
+          const nums = meetings.map(m => parseInt((m.id||'').replace('d',''))).filter(n => !isNaN(n) && n > 0);
+          const newId = 'd' + (nums.length > 0 ? Math.max(...nums) + 1 : 1);
+
+          const newDate = {
+            id:      newId,
+            title:   parsed.title,
+            isoDate,
+            type:    parsed.type || 'event',
+            notes:   parsed.notes || '',
+            addedBy: senderName,
+            created: new Date().toISOString(),
+          };
+
+          meetings.push(newDate);
+          meetings.sort((a, b) => new Date(a.isoDate) - new Date(b.isoDate));
+          await kvSet('meetings', meetings, KV_URL, KV_TOKEN);
+
+          const typeIcons = { meeting:'📅', deadline:'⏰', event:'📌', fyi:'💡', travel:'✈️' };
+          const icon = typeIcons[newDate.type] || '📅';
+          const displayDate = new Date(isoDate).toLocaleDateString('en-PH', { weekday:'short', month:'short', day:'numeric' });
+
+          reply  = `${icon} <b>Key date added!</b>\n\n`;
+          reply += `📋 ${newDate.title}\n`;
+          reply += `📅 ${displayDate}${parsed.time ? ' · 🕐 ' + parsed.time : ''}\n`;
+          reply += `🏷 ${newDate.type.toUpperCase()}\n`;
+          if (newDate.notes) reply += `📝 ${newDate.notes}\n`;
+          reply += `🆔 <code>${newId}</code>\n\n`;
+          reply += `<i>Reschedule?</i> <code>/reschedule ${newId} [new date]</code>\n`;
+          reply += `<i>Remove?</i> <code>/removedate ${newId}</code>`;
+
+        } catch(e) {
+          reply  = `⚠️ Could not parse that date. Try:\n`;
+          reply += `<code>/adddate Sui check-in Apr 21 3pm, meeting</code>`;
+        }
+      }
+    }
+
+    // ════════════════════════════════════════
+    // /reschedule [id] [new date]
+    // ════════════════════════════════════════
+    else if (command === '/reschedule') {
+      const id        = args[0];
+      const dateParts = args.slice(1).join(' ').trim();
+      if (!id || !dateParts) {
+        reply  = '⚠️ Usage: <code>/reschedule [id] [new date]</code>\n\n';
+        reply += 'Examples:\n';
+        reply += '• <code>/reschedule d1 Apr 28</code>\n';
+        reply += '• <code>/reschedule d3 May 10 2pm</code>';
+      } else {
+        const meetings = await kvGetParsed('meetings', KV_URL, KV_TOKEN) || [];
+        const mtg = meetings.find(m => m.id === id);
+        if (!mtg) {
+          reply = `⚠️ Key date <code>${id}</code> not found. Use /dates to see all IDs.`;
+        } else {
+          const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+          // Try to parse month name from dateParts
+          const dateMatch = dateParts.match(/([a-zA-Z]+)\s+(\d{1,2})/);
+          const slashMatch = dateParts.match(/(\d{1,2})[\/\-](\d{1,2})/);
+          let month, day;
+          if (dateMatch) {
+            month = months[dateMatch[1].slice(0,3).charAt(0).toUpperCase() + dateMatch[1].slice(1,3).toLowerCase()];
+            day   = parseInt(dateMatch[2]);
+          } else if (slashMatch) {
+            month = parseInt(slashMatch[1]) - 1;
+            day   = parseInt(slashMatch[2]);
+          }
+          if (isNaN(month) || isNaN(day)) {
+            reply = `⚠️ Could not parse "${dateParts}". Try: <code>/reschedule ${id} Apr 28</code>`;
+          } else {
+            const oldDate = new Date(mtg.isoDate).toLocaleDateString('en-PH', { month:'short', day:'numeric' });
+            const yr = new Date().getFullYear();
+            const existingTime = mtg.isoDate.split('T')[1] || '00:00:00';
+            mtg.isoDate = `${yr}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}T${existingTime}`;
+            meetings.sort((a, b) => new Date(a.isoDate) - new Date(b.isoDate));
+            await kvSet('meetings', meetings, KV_URL, KV_TOKEN);
+            const newDateStr = new Date(mtg.isoDate).toLocaleDateString('en-PH', { weekday:'short', month:'short', day:'numeric' });
+            reply  = `📅 <b>Rescheduled!</b>\n\n`;
+            reply += `${mtg.title}\n`;
+            reply += `<s>${oldDate}</s> → <b>${newDateStr}</b>\n`;
+            reply += `🆔 <code>${id}</code>\n\n`;
+            reply += `<i>Dashboard updates within 30 seconds.</i>`;
+          }
+        }
+      }
+    }
+
+    // ════════════════════════════════════════
+    // /removedate [id]
+    // ════════════════════════════════════════
+    else if (command === '/removedate') {
+      const id = args[0];
+      if (!id) {
+        reply = '⚠️ Usage: <code>/removedate [id]</code>\n\nUse /dates to see all IDs.';
+      } else {
+        const meetings = await kvGetParsed('meetings', KV_URL, KV_TOKEN) || [];
+        const idx = meetings.findIndex(m => m.id === id);
+        if (idx === -1) {
+          reply = `⚠️ Key date <code>${id}</code> not found.`;
+        } else {
+          const title = meetings[idx].title;
+          meetings.splice(idx, 1);
+          await kvSet('meetings', meetings, KV_URL, KV_TOKEN);
+          reply = `🗑️ Removed: <b>${title}</b> <code>${id}</code>`;
+        }
+      }
+    }
+      
     // ════════════════════════════════════════
     // /help
     // ════════════════════════════════════════
@@ -1014,6 +1202,12 @@ else if (command === '/movetask') {
       reply += `/ping — bot online check\n`;
       reply += `/ask [question] — AI assistant\n`;
       reply += `reply to bot message — AI follow-up\n\n`;
+      reply += `<b>── KEY DATES ──</b>\n`;
+      reply += `/dates — list all upcoming key dates\n`;
+      reply += `/adddate [natural language] — add a key date\n`;
+      reply += `  <code>/adddate Sui call Apr 21 3pm, meeting</code>\n`;
+      reply += `/reschedule [id] [date] — reschedule · <code>/reschedule d1 Apr 28</code>\n`;
+      reply += `/removedate [id] — remove · <code>/removedate d1</code>\n\n`;
       reply += `<b>── TEAM ──</b>\n`;
       reply += teamListStr();
     }
