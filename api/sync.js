@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { tasks, risks, chapters, budget } = req.body;
+    const { tasks, risks, chapters, budget, meetings } = req.body;
 
     if (!tasks || !risks || !chapters) {
       return res.status(400).json({ ok: false, error: 'Missing required fields' });
@@ -22,7 +22,8 @@ export default async function handler(req, res) {
       kvSet('risks',    risks,    KV_REST_API_URL, KV_REST_API_TOKEN),
       kvSet('chapters', chapters, KV_REST_API_URL, KV_REST_API_TOKEN),
       kvSet('synced_at', new Date().toISOString(), KV_REST_API_URL, KV_REST_API_TOKEN),
-      ...(budget ? [kvSet('budget', budget, KV_REST_API_URL, KV_REST_API_TOKEN)] : []),
+      ...(budget   ? [kvSet('budget',   budget,   KV_REST_API_URL, KV_REST_API_TOKEN)] : []),
+      ...(meetings ? [kvSet('meetings', meetings, KV_REST_API_URL, KV_REST_API_TOKEN)] : []),
     ]);
 
     console.log('✅ Sync complete at', new Date().toISOString());
