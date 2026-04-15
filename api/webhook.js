@@ -109,14 +109,15 @@ function nameMatch(assign, nameList) {
 // ── SEQUENTIAL TASK ID ──
 function nextTaskId(tasks) {
   const all = [
-    ...(tasks.critical || []),
-    ...(tasks.high || []),
-    ...(tasks.medium || []),
-    ...(tasks.backlog || []),
+    ...(tasks.critical  || []),
+    ...(tasks.high      || []),
+    ...(tasks.high_done || []),
+    ...(tasks.medium    || []),
+    ...(tasks.backlog   || []),
   ];
   const nums = all
-    .map(t => parseInt((t.id || '').replace('t', '')))
-    .filter(n => !isNaN(n) && n < 1000000);
+    .map(t => parseInt((t.id || '').replace(/\D/g, '')))
+    .filter(n => !isNaN(n) && n > 0 && n < 1000000);
   return 't' + (nums.length > 0 ? Math.max(...nums) + 1 : 1);
 }
 
