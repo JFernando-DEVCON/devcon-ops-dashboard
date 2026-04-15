@@ -1025,7 +1025,16 @@ function taskRow(t, realIdx, isDone) {
     <div class="task-check ${isDone ? 'done' : ''}" onclick="toggleTask('${prio}',${realIdx})"></div>
     <span class="task-id-badge">${h(t.id)}</span>
     <div style="display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden">
-      <div class="task-text ${isDone ? 'done' : ''}">${h(t.text)}</div>
+      <div style="display:flex;align-items:flex-start;gap:6px">
+        <div class="task-text ${isDone ? 'done' : ''}">${h(t.text)}</div>
+        ${!isDone ? `<button
+          onclick="editTaskText('${prio}',${realIdx})"
+          title="Edit task text"
+          style="background:transparent;border:none;color:var(--dim);font-size:10px;cursor:pointer;padding:1px 3px;flex-shrink:0;line-height:1;margin-top:2px;transition:color .15s"
+          onmouseover="this.style.color='var(--acc)'"
+          onmouseout="this.style.color='var(--dim)'"
+        >✏️</button>` : ''}
+      </div>
       ${isBacklog && t.backlogFrom ? `<span style="font-family:var(--mono);font-size:10px;color:var(--org);margin-top:1px">↑ was ${t.backlogFrom.toUpperCase()}</span>` : ''}
     </div>
     <span class="task-assign"
@@ -1045,7 +1054,13 @@ function taskRow(t, realIdx, isDone) {
         onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'"
       >📅</button>
     </span>
-    <div class="task-prio ${prioClass}"></div>
+      <div class="task-prio ${prioClass}"
+      onclick="moveTask('${prio}',${realIdx})"
+      title="Change priority"
+      style="cursor:pointer;transition:transform .15s"
+      onmouseover="this.style.transform='scale(1.8)'"
+      onmouseout="this.style.transform='scale(1)'">
+      </div>
     <button class="task-del" onclick="deleteTask('${prio}',${realIdx})" title="Delete task">✕</button>
   </div>`;
 }
@@ -1206,6 +1221,58 @@ function editTaskDue(prio, idx) {
   renderTasks();
 }
 
+function editTaskText(prio, idx) {
+  const task = (tasks[prio] || [])[idx];
+  if (!task) return;
+
+  const newText = prompt(
+    `Edit task text:\n\nCurrent:\n"${task.text}"\n\nEnter new text:`,
+    task.text
+  );
+  if (newText === null) return;
+  const trimmed = newText.trim();
+  if (!trimmed) { alert('Task text cannot be empty.'); return; }
+  if (trimmed === task.text) return;
+
+  task.text = trimmed;
+  saveState();
+  renderTasks();
+}
+
+function moveTask(currentPrio, idx) {
+  const task = (tasks[currentPrio] || [])[idx];
+  if (!task) return;
+
+  const options = ['critical','high','medium','backlog']
+    .filter(p => p !== currentPrio)
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1));
+
+  const choice = prompt(
+    `Move task to which priority?\n\n"${task.text}"\nCurrently in: ${currentPrio.toUpperCase()}\n\nType: critical, high, medium, or backlog`,
+    ''
+  );
+  if (!choice) return;
+  const target = choice.trim().toLowerCase();
+  if (!['critical','high','medium','backlog'].includes(target)) {
+    alert('Invalid priority. Use: critical, high, medium, or backlog');
+    return;
+  }
+  if (target === currentPrio) return;
+
+  // Move task
+  tasks[currentPrio].splice(idx, 1);
+  if (target === 'backlog') {
+    task.backlogFrom = currentPrio;
+    task.movedToBacklog = new Date().toISOString();
+  } else {
+    delete task.backlogFrom;
+    delete task.movedToBacklog;
+  }
+  tasks[target].push(task);
+  saveState();
+  renderTasks();
+}
+  
 function editTaskAssign(prio, idx) {
   const task = (tasks[prio] || [])[idx];
   if (!task) return;
