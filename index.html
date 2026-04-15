@@ -772,6 +772,9 @@ if (!tasks.backlog)   tasks.backlog   = [];
 if (!tasks.high_done) tasks.high_done = [];
 let schedActive = false, schedInterval = null;
 
+// ── SYNC GUARD — prevents writing until server data is loaded ──
+let serverLoaded = false;
+
 function saveState() {
   // Ensure backlog always exists before saving
   if (!tasks.backlog) tasks.backlog = [];
@@ -784,6 +787,11 @@ function saveState() {
 }
 
 async function syncToServer() {
+  // Don't write to server until we've confirmed what's already there
+  if (!serverLoaded) {
+    console.log('⏳ Skipping sync — server not yet loaded');
+    return;
+  }
   const statusEl = document.getElementById('sync-status');
   try {
     if (statusEl) statusEl.textContent = '⏳ Saving...';
@@ -800,8 +808,12 @@ async function syncToServer() {
         setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
       }
     } else {
-      console.warn('⚠ Sync error:', d);
-      if (statusEl) statusEl.textContent = '⚠ Sync error';
+      console.error('❌ Sync error from server:', JSON.stringify(d));
+      if (statusEl) {
+        statusEl.textContent = '❌ Save failed!';
+        statusEl.style.color = 'var(--red)';
+        setTimeout(() => { statusEl.textContent = ''; statusEl.style.color = ''; }, 6000);
+      }
     }
   } catch (err) {
     console.warn('⚠ Sync failed:', err.message);
@@ -864,7 +876,8 @@ async function loadFromServer() {
     sessionStorage.setItem('risks',    JSON.stringify(risks));
     sessionStorage.setItem('chapters', JSON.stringify(chapters));
     sessionStorage.setItem('budget',   JSON.stringify(budget));
-
+    serverLoaded = true;
+    
     renderOverview();
     renderTasks();
     renderChapters();
