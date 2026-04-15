@@ -1028,19 +1028,22 @@ else if (command === '/movetask') {
   } catch (err) {
     console.error('Webhook error:', err);
     reply = `⚠️ Error: ${err.message}`;
-    await logToKV('error', command, senderName, err.message);
+    // Fire log without awaiting — don't block reply
+    logToKV('error', command, senderName, err.message).catch(console.warn);
   }
 
-  // Log successful command (skip non-commands like mentions/replies)
-  if (isCommand && reply && !reply.startsWith('⚠️ Error:')) {
+  // Send reply immediately — log after
+  await sendReply(reply);
+
+  // Log without blocking
+  if (isCommand) {
     const preview = reply.replace(/<[^>]+>/g, '').slice(0, 120);
-    await logToKV(
-      reply.includes('❓') ? 'warn' : 'ok',
+    logToKV(
+      reply.startsWith('⚠️ Error:') ? 'error' : reply.includes('❓') ? 'warn' : 'ok',
       command,
       senderName,
       preview
-    );
+    ).catch(console.warn);
   }
 
-  await sendReply(reply);
   return res.status(200).end();
