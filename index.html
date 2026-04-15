@@ -962,6 +962,20 @@ function applyTaskFilter() {
   renderTasks();
 }
 
+// ── SEQUENTIAL TASK ID — mirrors webhook.js logic ──
+function nextTaskId() {
+  const all = [
+    ...(tasks.critical  || []),
+    ...(tasks.high      || []),
+    ...(tasks.medium    || []),
+    ...(tasks.backlog   || []),
+  ];
+  const nums = all
+    .map(t => parseInt((t.id || '').replace('t', '')))
+    .filter(n => !isNaN(n) && n < 1000000);
+  return 't' + (nums.length > 0 ? Math.max(...nums) + 1 : 1);
+}
+  
 function clearTaskFilter() {
   const g = document.getElementById('task-filter-group');
   const c = document.getElementById('task-filter-chapter');
@@ -1132,7 +1146,7 @@ function addTask(prio, input) {
   if (inputDue === null) return; // user cancelled — abort
   const due = inputDue.trim() || defaultDueStr;
  
-  const id = 't' + Date.now();
+  const id = nextTaskId();
   tasks[prio].push({
     id,
     text,
