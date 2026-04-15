@@ -842,13 +842,17 @@ async function loadFromServer() {
 
     // Only update if server returned valid non-empty data
     // Guards against overwriting local data with empty arrays
-    if (t.data && t.data.critical !== undefined) {
+    if (t.data && typeof t.data === 'object' && !Array.isArray(t.data)) {
       tasks = t.data;
-      if (!tasks.backlog) tasks.backlog = [];
+      if (!tasks.backlog)   tasks.backlog   = [];
+      if (!tasks.critical)  tasks.critical  = [];
+      if (!tasks.high)      tasks.high      = [];
+      if (!tasks.medium)    tasks.medium    = [];
+      if (!tasks.high_done) tasks.high_done = [];
     } else {
-      console.warn('⚠ Server returned empty/invalid tasks — keeping local data');
+      console.warn('⚠ Server tasks invalid — keeping local data');
     }
-    if (r.data && Array.isArray(r.data)) risks    = r.data;
+    if (t.data && Array.isArray(r.data)) risks    = r.data;
     if (c.data && Array.isArray(c.data)) chapters = c.data;
     if (b.data && Array.isArray(b.data)) budget   = b.data;
 
