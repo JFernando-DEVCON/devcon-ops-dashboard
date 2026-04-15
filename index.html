@@ -840,14 +840,19 @@ async function loadFromServer() {
       tasksRes.json(), risksRes.json(), chaptersRes.json(), budgetRes.json()
     ]);
 
-    // Update in-memory state from server
-    if (t.data) { tasks    = t.data; if (!tasks.backlog) tasks.backlog = []; }
-    if (r.data)   risks    = r.data;
-    if (c.data)   chapters = c.data;
-    if (b.data)   budget   = b.data;
+    // Only update if server returned valid non-empty data
+    // Guards against overwriting local data with empty arrays
+    if (t.data && t.data.critical !== undefined) {
+      tasks = t.data;
+      if (!tasks.backlog) tasks.backlog = [];
+    } else {
+      console.warn('⚠ Server returned empty/invalid tasks — keeping local data');
+    }
+    if (r.data && Array.isArray(r.data)) risks    = r.data;
+    if (c.data && Array.isArray(c.data)) chapters = c.data;
+    if (b.data && Array.isArray(b.data)) budget   = b.data;
 
-    // ── KEY FIX: sync sessionStorage to match server data ──
-    // This prevents stale sessionStorage from overwriting fresh bot writes
+    // Sync sessionStorage to match server — prevents stale data overwriting bot writes
     sessionStorage.setItem('tasks',    JSON.stringify(tasks));
     sessionStorage.setItem('risks',    JSON.stringify(risks));
     sessionStorage.setItem('chapters', JSON.stringify(chapters));
@@ -1351,7 +1356,7 @@ function moveToBacklog() {
     const toMove = (tasks[prio] || []).filter(t => !t.done && isOverdue(t));
     if (toMove.length) {
       toMove.forEach(t => {
-        // Only add to backlog if not already there
+        // Only add if not already in backlog
         const alreadyInBacklog = (tasks.backlog || []).some(b => b.id === t.id);
         if (!alreadyInBacklog) {
           t.backlogFrom    = prio;
@@ -1363,7 +1368,7 @@ function moveToBacklog() {
       tasks[prio] = tasks[prio].filter(t => !toMove.includes(t));
     }
   });
-  // Only save + sync if tasks actually moved — prevents overwriting fresh bot data
+  // Only save if tasks actually moved — prevents overwriting fresh bot data
   if (moved) saveState();
   return moved;
 }
@@ -1825,9 +1830,9 @@ window.addEventListener('load', async ()=>{
   if(sessionStorage.getItem('pw_ok')==='1'){
     document.getElementById('pw-gate').style.display='none';
     document.getElementById('app-shell').style.display='grid';
-    await loadTgCfg();    // ← await so token loads before any Telegram action
+    await loadTgCfg();
     await loadFromServer();
-    moveToBacklog();
+    // moveToBacklog is called inside renderTasks() via loadFromServer() — no need to call again
     startAutoPoll();
   } else {
     document.getElementById('pw-input').focus();
