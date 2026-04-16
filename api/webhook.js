@@ -473,31 +473,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── EDIT MESSAGE HELPER ──
-  async function editMessage(msgId, text, markup = null) {
-    const body = {
-      chat_id: chatId,
-      message_id: msgId,
-      text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true
-    };
-    if (markup) body.reply_markup = markup;
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-  }
-
-  // ── ANSWER CALLBACK HELPER ──
-  async function answerCallback(callbackId, text = '') {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ callback_query_id: callbackId, text })
-    });
-  }
 
   // Extract sender name for logs
   const senderName = message.from
@@ -1314,12 +1289,8 @@ Rules:
         }
       }
     }
-      
-    // ════════════════════════════════════════
-    // /help
-    // ════════════════════════════════════════
-  
-    // ════════════════════════════════════════
+
+// ════════════════════════════════════════
 // /edittask [id] [new text]
 // ════════════════════════════════════════
 else if (command === '/edittask') {
