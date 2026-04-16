@@ -2031,19 +2031,19 @@ function renderBudget() {
     </div>`).join('');
 }
 
-function editSpent(budgetId) {
+async function editSpent(budgetId) {
   const line = budget.find(b => b.id === budgetId);
   if (!line) return;
-  const newVal = prompt(
-    `Update Spent — Line ${line.num}\n${line.name}\n\nCurrent: ₱${line.spent.toLocaleString()}\nAllocated: ₱${line.alloc.toLocaleString()}\n\nEnter new spent amount:`,
-    line.spent
+  const newVal = await Modal.prompt(
+    'Update Spent',
+    `Line ${line.num} — ${line.name}`,
+    'e.g. 50000',
+    String(line.spent),
+    `Current: ₱${line.spent.toLocaleString()} · Allocated: ₱${line.alloc.toLocaleString()}`
   );
   if (newVal === null) return;
   const parsed = parseInt(String(newVal).replace(/[₱,\s]/g, ''));
-  if (isNaN(parsed) || parsed < 0) {
-    alert('Invalid amount. Enter a number like 50000');
-    return;
-  }
+  if (isNaN(parsed) || parsed < 0) return;
   line.spent = parsed;
   saveState();
   renderBudget();
@@ -2084,13 +2084,54 @@ function resolveRisk(id) {
   saveState(); renderRisks();
 }
 
-function addRiskPrompt() {
-  const title = prompt('Risk title:'); if(!title) return;
-  const action = prompt('Action item:') || '—';
-  const sev = prompt('Severity (critical/high/medium/low):','high') || 'high';
-  const owner = prompt('Owner:','Dom') || 'Dom';
-  risks.unshift({id:'r'+Date.now(),title,action,desc:'',sev,owner,status:'open'});
-  saveState(); renderRisks();
+async function addRiskPrompt() {
+  const title = await Modal.prompt(
+    'Add Risk',
+    'What is the risk or issue?',
+    'e.g. Tacloban date still unconfirmed...',
+    ''
+  );
+  if (!title || !title.trim()) return;
+
+  const action = await Modal.prompt(
+    'Action Item',
+    h(title.trim()),
+    'e.g. Rolf to confirm by Apr 30...',
+    '',
+    'What needs to be done to resolve this risk?'
+  );
+  if (action === null) return;
+
+  const sevChoice = await Modal.prompt(
+    'Severity',
+    'How critical is this risk?',
+    'critical / high / medium / low',
+    'high',
+    'Options: critical · high · medium · low'
+  );
+  const sev = ['critical','high','medium','low'].includes((sevChoice||'').trim().toLowerCase())
+    ? sevChoice.trim().toLowerCase()
+    : 'high';
+
+  const owner = await Modal.prompt(
+    'Owner',
+    'Who is responsible for resolving this?',
+    'e.g. Dom, Jedd, Rolf...',
+    'Dom'
+  );
+  if (owner === null) return;
+
+  risks.unshift({
+    id:     'r' + Date.now(),
+    title:  title.trim(),
+    action: (action || '—').trim(),
+    desc:   '',
+    sev,
+    owner:  (owner || 'Dom').trim(),
+    status: 'open'
+  });
+  saveState();
+  renderRisks();
 }
 
 // ══════════════════════════════════════════════════════════════
