@@ -436,7 +436,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <div class="logo-tag">MOU 2026</div>
     <img class="logo-img" src="https://raw.githubusercontent.com/JFernando-DEVCON/devcon-ops-dashboard/main/public/devcon-logo-white.png" alt="DEVCON" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
     <div style="display:none;font-family:var(--hdg);font-size:22px;font-weight:700;color:var(--txt);letter-spacing:-.02em;margin-bottom:6px">DEVCON</div>
-    <div class="logo-sub">OPS DASHBOARD · SUI × MOU 2026</div>
+    <div class="logo-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">OPS DASHBOARD · SUI 2026</div>
   </div>
 
   <div class="nav-section">
@@ -508,11 +508,11 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <!-- ─── OVERVIEW ─── -->
 <div class="page active" id="page-overview">
   <div class="pg-header">
-    <div><div class="pg-title">Good morning, Dom. 👋</div><div class="pg-sub">DEVCON × SUI MOU · OPERATIONAL OVERVIEW · 2026</div></div>
+<div><div class="pg-title" id="pg-greeting">DEVCON OPS</div><div class="pg-sub">DEVCON × SUI MOU · OPERATIONAL OVERVIEW · 2026</div></div>
     <div style="display:flex;gap:8px">
-  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
-  <button class="btn btn-acc" onclick="refreshAI()">⚡ AI BRIEFING</button>
-</div>
+      <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">REFRESH</button>
+      <button class="btn btn-acc" onclick="refreshAI()">AI BRIEFING</button>
+    </div>
   </div>
 
   <div class="stat-row">
@@ -525,7 +525,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   <!-- AI Brief -->
   <div class="card">
     <div class="card-head">
-      <span class="card-title">🤖 AI DAILY BRIEF</span>
+      <span class="card-title">AI DAILY BRIEF</span>
       <span style="font-family:var(--mono);font-size:9px;color:var(--dim)" id="brief-ts">not generated</span>
     </div>
     <div style="padding:16px;font-family:var(--mono);font-size:12px;line-height:1.85;color:#8890aa;white-space:pre-wrap;word-break:break-word;min-height:80px" id="brief-body">Click "AI Briefing" to generate today's ops summary.</div>
@@ -533,7 +533,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
   <!-- Quick events -->
   <div class="card">
-    <div class="card-head"><span class="card-title">📅 UPCOMING EVENTS</span></div>
+    <div class="card-head"><span class="card-title">UPCOMING EVENTS</span></div>
     <div id="events-list"></div>
   </div>
 </div>
@@ -544,10 +544,10 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <div><div class="pg-title">National Tasks</div><div class="pg-sub">HQ ACTION ITEMS · JEDD & DOM</div></div>
 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <select id="task-filter-group" class="tg-mini-input" style="width:auto;font-size:12px;padding:6px 12px;cursor:pointer" onchange="applyTaskFilter()">
-    <option value="">👥 All Groups</option>
-    <option value="hq">🏢 HQ / National Office</option>
-    <option value="chapters">🗺️ Chapter Leaders</option>
-    <option value="interns">🎓 Interns</option>
+    <option value="">All Groups</option>
+    <option value="hq">HQ / National Office</option>
+    <option value="chapters">Chapter Leaders</option>
+    <option value="interns">Interns</option>
   </select>
   <select id="task-filter-chapter" class="tg-mini-input" style="width:auto;font-size:12px;padding:6px 12px;cursor:pointer;display:none" onchange="applyTaskFilter()">
     <option value="">All Chapters</option>
@@ -562,34 +562,34 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <option value="Davao">Davao</option>
     <option value="Iligan">Iligan</option>
   </select>
-  <button class="btn btn-ghost btn-sm" onclick="clearTaskFilter()">✕ CLEAR</button>
-  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+  <button class="btn btn-ghost btn-sm" onclick="clearTaskFilter()">CLEAR</button>
+  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">REFRESH</button>
   <button class="btn btn-ghost btn-sm" onclick="clearDone('tasks')">CLEAR DONE</button>
   <button class="btn btn-acc btn-sm" onclick="addTask('medium',document.getElementById('add-medium'))">+ ADD TASK</button>
 </div>
 </div>
 
   <div class="card" id="tasks-critical-card">
-    <div class="card-head"><span class="card-title">🔴 CRITICAL — NEEDS ACTION NOW</span><span class="prog-pill" id="tasks-crit-prog">0/0</span></div>
+    <div class="card-head"><span class="card-title"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:8px"></span>CRITICAL — NEEDS ACTION NOW</span><span class="prog-pill" id="tasks-crit-prog">0/0</span></div>
     <div id="tasks-critical"></div>
     <div class="add-task-row"><input class="add-input" id="add-critical" placeholder="Add critical task..." onkeydown="if(event.key==='Enter')addTask('critical',this)"><button class="add-btn" onclick="addTask('critical',document.getElementById('add-critical'))">ADD</button></div>
   </div>
 
   <div class="card" id="tasks-high-card">
-    <div class="card-head"><span class="card-title">🟠 HIGH PRIORITY</span><span class="prog-pill" id="tasks-high-prog">0/0</span></div>
+    <div class="card-head"><span class="card-title"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dv-orange);margin-right:8px"></span>HIGH PRIORITY</span><span class="prog-pill" id="tasks-high-prog">0/0</span></div>
     <div id="tasks-high"></div>
     <div class="add-task-row"><input class="add-input" id="add-high" placeholder="Add high priority task..." onkeydown="if(event.key==='Enter')addTask('high',this)"><button class="add-btn" onclick="addTask('high',document.getElementById('add-high'))">ADD</button></div>
   </div>
 
 <div class="card">
-    <div class="card-head"><span class="card-title">🟡 THIS WEEK</span><span class="prog-pill" id="tasks-med-prog">0/0</span></div>
+    <div class="card-head"><span class="card-title"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dv-yellow);margin-right:8px"></span>THIS WEEK</span><span class="prog-pill" id="tasks-med-prog">0/0</span></div>
     <div id="tasks-medium"></div>
     <div class="add-task-row"><input class="add-input" id="add-medium" placeholder="Add task..." onkeydown="if(event.key==='Enter')addTask('medium',this)"><button class="add-btn" onclick="addTask('medium',document.getElementById('add-medium'))">ADD</button></div>
   </div>
 
   <div class="card" id="tasks-backlog-card">
-    <div class="card-head">
-      <span class="card-title">📦 BACKLOG — OVERDUE</span>
+<div class="card-head">
+      <span class="card-title"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--sub);margin-right:8px"></span>BACKLOG — OVERDUE</span>
       <span class="prog-pill" id="tasks-backlog-prog">0/0</span>
     </div>
     <div id="tasks-backlog"></div>
@@ -603,16 +603,16 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <div><div class="pg-title">Chapter Code Camp Tracker</div><div class="pg-sub">5 EVENTS · NATIONWIDE · BY JUN 24, 2026</div></div>
 <div style="display:flex;gap:6px;align-items:center">
   <span style="font-family:var(--mono);font-size:10px;color:var(--sub)" id="camps-done-label">0 of 5 complete</span>
-  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">REFRESH</button>
 </div>
   </div>
 
   <div class="stat-row" style="grid-template-columns:repeat(5,1fr)">
-    <div class="stat"><div class="stat-lbl">Manila</div><div class="stat-val" id="ch-stat-1" style="font-size:16px">⏳</div><div class="stat-hint">Mar 28</div></div>
-    <div class="stat"><div class="stat-lbl">Tacloban</div><div class="stat-val" id="ch-stat-2" style="font-size:16px">📋</div><div class="stat-hint">Apr 11</div></div>
-    <div class="stat"><div class="stat-lbl">Iloilo</div><div class="stat-val" id="ch-stat-3" style="font-size:16px">🔧</div><div class="stat-hint">May 16</div></div>
-    <div class="stat"><div class="stat-lbl">Bukidnon</div><div class="stat-val" id="ch-stat-4" style="font-size:16px">⚠️</div><div class="stat-hint">May 6</div></div>
-    <div class="stat"><div class="stat-lbl">Pampanga</div><div class="stat-val" id="ch-stat-5" style="font-size:16px">📌</div><div class="stat-hint">Jun 24</div></div>
+  <div class="stat"><div class="stat-lbl">Manila</div><div class="stat-val c-grn" id="ch-stat-1" style="font-size:13px;font-weight:600">DONE</div><div class="stat-hint">Mar 28</div></div>
+  <div class="stat"><div class="stat-lbl">Tacloban</div><div class="stat-val c-sub" id="ch-stat-2" style="font-size:13px;font-weight:600">PENDING</div><div class="stat-hint">Apr 11</div></div>
+  <div class="stat"><div class="stat-lbl">Iloilo</div><div class="stat-val c-sub" id="ch-stat-3" style="font-size:13px;font-weight:600">PENDING</div><div class="stat-hint">May 16</div></div>
+  <div class="stat"><div class="stat-lbl">Bukidnon</div><div class="stat-val c-org" id="ch-stat-4" style="font-size:13px;font-weight:600">ON TRACK</div><div class="stat-hint">May 6</div></div>
+  <div class="stat"><div class="stat-lbl">Pampanga</div><div class="stat-val c-sub" id="ch-stat-5" style="font-size:13px;font-weight:600">PENDING</div><div class="stat-hint">Jun 24</div></div>  
   </div>
 
   <div class="chapter-grid" id="chapter-grid"></div>
@@ -624,7 +624,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <div><div class="pg-title">Budget Tracker</div><div class="pg-sub">ANNEX A · SUI FOUNDATION GRANT · ₱1,000,000 SUBTOTAL + 12% VAT ₱120,000 = ₱1,120,000</div></div>
     <div style="display:flex;gap:8px;align-items:center">
   <div style="font-family:var(--mono);font-size:11px;color:var(--sub)">Grand Total: ₱1,120,000 · 20% Admin Fee (Line 10)</div>
-  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">REFRESH</button>
 </div>
   </div>
 
@@ -636,7 +636,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">📊 ANNEX A — LINE ITEM STATUS</span></div>
+<div class="card-head"><span class="card-title">ANNEX A — LINE ITEM STATUS</span></div>
     <table class="budget-table" id="budget-table">
       <thead><tr><th>#</th><th>Budget Line</th><th>Allocated</th><th>Spent / Committed</th><th>Remaining</th><th style="min-width:100px">Utilization</th></tr></thead>
       <tbody id="budget-tbody"></tbody>
@@ -644,7 +644,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">💳 CONFIRMED PAYMENTS</span></div>
+    <div class="card-head"><span class="card-title">CONFIRMED PAYMENTS</span></div>
     <div id="payments-list" style="padding:14px;font-family:var(--mono);font-size:11px;line-height:2;color:var(--sub)"></div>
   </div>
 </div>
@@ -654,8 +654,8 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   <div class="pg-header">
     <div><div class="pg-title">Risks to Manage</div><div class="pg-sub">OPEN ISSUES · FLAGGED FOR DOM & JEDD</div></div>
 <div style="display:flex;gap:8px">
-  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
-  <button class="btn btn-ghost btn-sm" onclick="addRiskPrompt()">+ ADD RISK</button>
+  <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">REFRESH</button>
+<button class="btn btn-ghost btn-sm" onclick="addRiskPrompt()">+ ADD RISK</button>
 </div>
   </div>
 
@@ -667,7 +667,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">🚨 RISK REGISTER</span></div>
+<div class="card-head"><span class="card-title">RISK REGISTER</span></div>
     <div id="risk-list"></div>
   </div>
 </div>
@@ -679,7 +679,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">⚙️ BOT CONFIGURATION</span></div>
+<div class="card-head"><span class="card-title">BOT CONFIGURATION</span></div>
     <div style="padding:16px">
  <input type="hidden" id="tg-token" value="">
   <div>
@@ -688,8 +688,8 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   </div>
 </div>
     <div style="padding:0 16px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="btn btn-blu" onclick="testTg()">📡 TEST</button>
-      <button class="btn btn-ghost" onclick="findChatId()">🔍 FIND CHAT ID</button>
+      <button class="btn btn-blu" onclick="testTg()">TEST</button>
+      <button class="btn btn-ghost" onclick="findChatId()">FIND CHAT ID</button>
       <div style="margin-left:auto">
         <div style="font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:4px">AUTO-SEND TIME</div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -704,14 +704,15 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     </div>
   </div>
 
+  
   <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-    <button class="btn btn-acc" onclick="sendDailySummary()">📤 SEND DAILY SUMMARY</button>
-    <button class="btn btn-blu" onclick="sendCriticalOnly()">🚨 SEND CRITICAL ONLY</button>
-    <button class="btn btn-ghost" onclick="sendKpiSnapshot()">📊 KPI SNAPSHOT</button>
+    <button class="btn btn-acc" onclick="sendDailySummary()">SEND DAILY SUMMARY</button>
+    <button class="btn btn-blu" onclick="sendCriticalOnly()">SEND CRITICAL ONLY</button>
+    <button class="btn btn-ghost" onclick="sendKpiSnapshot()">KPI SNAPSHOT</button>
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">📋 SEND LOG</span></div>
+<div class="card-head"><span class="card-title">SEND LOG</span></div>
     <div id="tg-log" style="padding:14px;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--sub);min-height:60px;max-height:240px;overflow-y:auto">Waiting for send actions...</div>
   </div>
 </div>
@@ -724,7 +725,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
       <div class="pg-sub">IMPORTANT DATES · MEETINGS · DEADLINES · FYI</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">🔄 REFRESH</button>
+      <button class="btn btn-ghost btn-sm" onclick="manualRefresh()">REFRESH</button>
       <button class="btn btn-acc btn-sm" onclick="addDatePrompt()">+ ADD DATE</button>
     </div>
   </div>
@@ -738,14 +739,14 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
   <div class="card">
     <div class="card-head">
-      <span class="card-title">📅 KEY DATES</span>
+      <span class="card-title">KEY DATES</span>
       <select id="kd-filter" class="tg-mini-input" style="width:auto;font-size:11px;padding:5px 10px" onchange="renderDates()">
         <option value="">All Types</option>
-        <option value="meeting">📅 Meeting</option>
-        <option value="deadline">⏰ Deadline</option>
-        <option value="event">📌 Event</option>
-        <option value="fyi">💡 FYI</option>
-        <option value="travel">✈️ Travel</option>
+        <option value="meeting">Meeting</option>
+        <option value="deadline">Deadline</option>
+        <option value="event">Event</option>
+        <option value="fyi">FYI</option>
+        <option value="travel">Travel</option>
       </select>
     </div>
     <div id="dates-list"></div>
@@ -790,8 +791,8 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <span style="font-family:var(--mono);font-size:10px;color:var(--dim)" id="logs-last-updated"></span>
-      <button class="btn btn-ghost btn-sm" onclick="loadBotLogs()">🔄 REFRESH</button>
-      <button class="btn btn-red btn-sm" onclick="clearBotLogs()">🗑 CLEAR LOGS</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadBotLogs()">REFRESH</button>
+      <button class="btn btn-red btn-sm" onclick="clearBotLogs()">CLEAR LOGS</button>
     </div>
   </div>
 
@@ -804,13 +805,13 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
   <div class="card">
     <div class="card-head">
-      <span class="card-title">📋 COMMAND LOG</span>
+      <span class="card-title">COMMAND LOG</span>
       <div style="display:flex;gap:8px;align-items:center">
         <select id="log-filter" class="tg-mini-input" style="width:auto;font-size:11px;padding:5px 10px" onchange="renderBotLogs()">
           <option value="">All Commands</option>
-          <option value="ok">✅ Success only</option>
-          <option value="error">❌ Errors only</option>
-          <option value="warn">⚠️ Warnings only</option>
+          <option value="ok">Success only</option>
+          <option value="error">Errors only</option>
+          <option value="warn">Warnings only</option>
         </select>
       </div>
     </div>
