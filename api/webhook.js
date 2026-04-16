@@ -1208,6 +1208,8 @@ else if (command === '/movetask') {
       reply += `/ping — bot online check\n`;
       reply += `/ask [question] — AI assistant\n`;
       reply += `reply to bot message — AI follow-up\n\n`;
+      reply += `<b>── GRANTS ──</b>\n`;
+      reply += `/scout — run grant search now (also auto-runs Monday 10am)\n\n`;
       reply += `<b>── KEY DATES ──</b>\n`;
       reply += `/dates — list all upcoming key dates\n`;
       reply += `/adddate [natural language] — add a key date\n`;
@@ -1218,6 +1220,33 @@ else if (command === '/movetask') {
       reply += teamListStr();
     }
 
+// ════════════════════════════════════════
+    // /scout
+    // ════════════════════════════════════════
+    else if (command === '/scout') {
+      reply = `🔍 <b>Grant Scout running...</b>\n\nSearching for funding opportunities for DEVCON PH. This may take 15-20 seconds.\n\n<i>Results will be posted to this chat shortly.</i>`;
+      await sendReply(reply);
+
+      try {
+        const r = await fetch(
+          `${process.env.VERCEL_URL
+            ? 'https://' + process.env.VERCEL_URL
+            : 'https://devcon-ops-dashboard.vercel.app'}/api/scout`,
+          {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` }
+          }
+        );
+        const d = await r.json();
+        if (!d.ok) {
+          await sendReply(`⚠️ Scout error: ${d.error || 'Unknown error'}`);
+        }
+      } catch (e) {
+        await sendReply(`⚠️ Scout failed: ${e.message}`);
+      }
+      return res.status(200).end();
+    }
+  
     // ════════════════════════════════════════
     // Unknown
     // ════════════════════════════════════════
