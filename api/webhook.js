@@ -1571,9 +1571,10 @@ else if (command === '/scout') {
           timeZone: 'Asia/Manila'
         });
 
-        const scoutResponse = await anthropic.messages.create({
+      const scoutResponse = await anthropic.messages.create({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
+          max_tokens: 4000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
           system: `You are a grants research assistant for DEVCON Philippines, a registered non-profit tech community organization.
 Return ONLY valid JSON, no markdown, no backticks, no explanation.
 Return exactly this structure:
@@ -1604,9 +1605,23 @@ Rules:
           }]
         });
 
-        let grants = [];
+let grants = [];
         try {
-          const parsed = JSON.parse(scoutResponse.content[0].text.trim());
+          const textBlock = scoutResponse.content
+            .filter(b => b.type === 'text')
+            .pop();
+
+          if (!textBlock) {
+            await sendReply('⚠️ No response from grant search. Try again.');
+            return res.status(200).end();
+          }
+
+          const clean = textBlock.text
+            .replace(/```json/g, '')
+            .replace(/```/g, '')
+            .trim();
+
+          const parsed = JSON.parse(clean);
           grants = parsed.grants || [];
         } catch {
           await sendReply('⚠️ Could not parse grant results. Try again.');
