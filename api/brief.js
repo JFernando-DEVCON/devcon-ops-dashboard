@@ -55,29 +55,12 @@ export default async function handler(req, res) {
       ? chapters.filter(c => c.status === 'done').length
       : 1;
 
-    const AI_PROMPT = `You are the DEVCON × Sui MOU Compliance Agent for 2026.
-
-LIVE DATA as of today:
-- Days to Q2 deadline (Jun 30): ${days}
-- Code camps done: ${doneCamps}/5
-- Grant: ₱1,120,000 FULLY PAID
-- Budget spent: ₱${totalSpent.toLocaleString()} of ₱1,000,000 subtotal
-- Remaining: ₱${(1000000 - totalSpent).toLocaleString()}
-
-CRITICAL TASKS: ${criticalTasks || 'none'}
-HIGH TASKS: ${highTasks || 'none'}
-BACKLOG (overdue): ${backlogTasks || 'none'}
-OPEN RISKS: ${openRisks || 'none'}
-
-UPCOMING CAMPS:
-- Bukidnon × BSU: May 6
-- Iloilo × CPU: May 16
-- Tacloban × LNU: TBC (May or Jun)
-- Pampanga × CCA: Jun 24
-
-Write a concise DSU-format daily brief (200 words max) for Jedd and Dom.
-Structure: FOR APPROVAL (if any) → CRITICAL TODAY → TOP 3 PRIORITIES → DATES TO REMEMBER
-Use ₱ amounts. Be direct and tactical. No padding.`;
+    const AI_PROMPT = `DEVCON×Sui 2026 ops brief. ${days} days to Jun 30. ${doneCamps}/5 camps done. Spent ₱${totalSpent.toLocaleString()}/₱1M.
+CRITICAL: ${criticalTasks || 'none'}
+HIGH: ${highTasks || 'none'}
+RISKS: ${openRisks || 'none'}
+CAMPS: Bukidnon May6, Iloilo May16, Tacloban TBC, Pampanga Jun24.
+Write 150-word DSU brief for Jedd+Dom: CRITICAL TODAY → TOP 3 → DATES. Direct, no padding.`;
 
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -87,7 +70,7 @@ Use ₱ amounts. Be direct and tactical. No padding.`;
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 400,
         messages: [{ role: 'user', content: AI_PROMPT }]
       })
