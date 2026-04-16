@@ -11,23 +11,21 @@
     }
   ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/index.html"
-    }
+    { "src": "/api/get",       "dest": "/api/get.js" },
+    { "src": "/api/sync",      "dest": "/api/sync.js" },
+    { "src": "/api/brief",     "dest": "/api/brief.js" },
+    { "src": "/api/logs",      "dest": "/api/logs.js" },
+    { "src": "/api/webhook",   "dest": "/api/webhook.js" },
+    { "src": "/api/cron",      "dest": "/api/cron.js" },
+    { "src": "/api/scout",     "dest": "/api/scout.js" },
+    { "src": "/api/telegram",  "dest": "/api/telegram.js" },
+    { "src": "/api/config",    "dest": "/api/config.js" },
+    { "src": "/api/getchatid", "dest": "/api/getchatid.js" },
+    { "src": "/api/migrate",   "dest": "/api/migrate.js" },
+    { "src": "/",              "dest": "/index.html" }
   ],
   "crons": [
-    {
-      "path": "/api/cron",
-      "schedule": "0 2 * * 1-5"
-    },
-    {
-      "path": "/api/scout",
-      "schedule": "0 2 * * 1"
-    }
+    { "path": "/api/cron",  "schedule": "0 2 * * 1-5" },
+    { "path": "/api/scout", "schedule": "0 2 * * 1" }
   ]
 }
