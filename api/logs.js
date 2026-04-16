@@ -1,65 +1,61 @@
-const KV_URL   = process.env.KV_REST_API_URL;
-const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const MAX_LOGS = 100;
 
-async function kvGet(key) {
-  try {
-    const r = await fetch(`${KV_URL}/get/${key}`, {
-      headers: { Authorization: `Bearer ${KV_TOKEN}` }
-    });
-    const data = await r.json();
-    let parsed = data.result;
-    while (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch { break; }
+async function dbGet(key) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/kv_store?key=eq.${key}&select=value`, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`
     }
-    if (Array.isArray(parsed)) parsed = parsed[0];
-    if (parsed && typeof parsed === 'object' && 'value' in parsed && Object.keys(parsed).length === 1) {
-      parsed = parsed.value;
-      while (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed); } catch { break; }
-      }
-    }
-    return parsed;
-  } catch { return null; }
+  });
+  const rows = await r.json();
+  if (!rows || rows.length === 0) return null;
+  return rows[0].value;
 }
 
-async function kvSet(key, value) {
-  const r = await fetch(`${KV_URL}/set/${key}`, {
+async function dbSet(key, value) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/kv_store`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ value: JSON.stringify(value) })
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({ key, value, updated_at: new Date().toISOString() })
   });
-  return r.json();
+  return r.ok;
 }
 
 export default async function handler(req, res) {
-  // GET — fetch logs
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return res.status(500).json({ ok: false, error: 'Missing Supabase credentials' });
+  }
+
   if (req.method === 'GET') {
-    const logs = await kvGet('bot_logs') || [];
+    const logs = await dbGet('bot_logs') || [];
     return res.status(200).json({ ok: true, logs });
   }
 
-  // POST — append a log entry
   if (req.method === 'POST') {
     const { level, command, user, message, chatId } = req.body;
-    const logs = await kvGet('bot_logs') || [];
+    const logs = await dbGet('bot_logs') || [];
     logs.unshift({
       ts:      new Date().toISOString(),
-      level:   level || 'info',   // info | ok | error | warn
+      level:   level   || 'info',
       command: command || '—',
       user:    user    || '—',
       chatId:  chatId  || '—',
       message: message || '—',
     });
-    // Keep only last MAX_LOGS entries
     if (logs.length > MAX_LOGS) logs.splice(MAX_LOGS);
-    await kvSet('bot_logs', logs);
+    await dbSet('bot_logs', logs);
     return res.status(200).json({ ok: true });
   }
 
-  // DELETE — clear logs
   if (req.method === 'DELETE') {
-    await kvSet('bot_logs', []);
+    await dbSet('bot_logs', []);
     return res.status(200).json({ ok: true });
   }
 
