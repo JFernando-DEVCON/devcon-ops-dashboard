@@ -6,7 +6,8 @@ export default async function handler(req, res) {
   const origin  = req.headers['origin'] || '';
   const isFromDashboard = 
     referer.includes('devcon-ops-dashboard.vercel.app') ||
-    origin.includes('devcon-ops-dashboard.vercel.app');
+    origin.includes('devcon-ops-dashboard.vercel.app') ||
+    referer === '' && origin === ''; // allow direct browser requests
 
   if (!isFromDashboard) {
     return res.status(403).json({ error: 'Forbidden' });
