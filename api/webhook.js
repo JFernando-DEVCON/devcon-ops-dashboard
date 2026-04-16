@@ -44,19 +44,27 @@ function teamListStr() {
 }
 
 // ── KV HELPERS ──
-async function kvSet(key, value, url, token) {
-  const r = await fetch(`${url}/set/${key}`, {
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+async function kvSet(key, value) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/kv_store`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ value: JSON.stringify(value) })
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({ key, value, updated_at: new Date().toISOString() })
   });
-  const result = await r.json();
   if (!r.ok) {
-    console.error(`❌ KV write failed for "${key}":`, JSON.stringify(result));
-    throw new Error(`KV write failed for "${key}": ${JSON.stringify(result)}`);
+    const err = await r.text();
+    console.error(`❌ DB write failed for "${key}":`, err);
+    throw new Error(`DB write failed for "${key}": ${err}`);
   }
-  console.log(`✅ KV write OK: ${key}`);
-  return result;
+  console.log(`✅ DB write OK: ${key}`);
+  return true;
 }
 
 // ── BOT LOGGER ──
@@ -64,7 +72,7 @@ const MAX_LOGS = 100;
 
 async function logToKV(level, command, user, message) {
   try {
-    const logs = await kvGetParsed('bot_logs', KV_URL, KV_TOKEN) || [];
+    const logs = await kvGetParsed('bot_logs') || [];
     logs.unshift({
       ts:      new Date().toISOString(),
       level:   level   || 'info',
@@ -73,30 +81,23 @@ async function logToKV(level, command, user, message) {
       message: message || '—',
     });
     if (logs.length > MAX_LOGS) logs.splice(MAX_LOGS);
-    await kvSet('bot_logs', logs, KV_URL, KV_TOKEN);
+    await kvSet('bot_logs', bot_logs);
   } catch (e) {
     console.warn('⚠ Log write failed:', e.message);
   }
 }
 
-async function kvGetParsed(key, url, token) {
+async function kvGetParsed(key) {
   try {
-    const r = await fetch(`${url}/get/${key}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await r.json();
-    let parsed = data.result;
-    while (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch { break; }
-    }
-    if (Array.isArray(parsed)) parsed = parsed[0];
-    if (parsed && typeof parsed === 'object' && 'value' in parsed && Object.keys(parsed).length === 1) {
-      parsed = parsed.value;
-      while (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed); } catch { break; }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/kv_store?key=eq.${key}&select=value`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
       }
-    }
-    return parsed;
+    });
+    const rows = await r.json();
+    if (!rows || rows.length === 0) return null;
+    return rows[0].value;
   } catch { return null; }
 }
 
@@ -221,7 +222,7 @@ export default async function handler(req, res) {
     // /tasks
     // ════════════════════════════════════════
     else if (command === '/tasks') {
-      const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+      const tasks = await kvGetParsed('tasks');
       if (!tasks) { reply = '⚠️ No data found.'; }
       else {
         const critical = (tasks.critical || []).filter(t => !t.done);
@@ -261,7 +262,7 @@ export default async function handler(req, res) {
       const id = args[0];
       if (!id) { reply = '⚠️ Usage: <code>/done t1</code>'; }
       else {
-        const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+        const tasks = await kvGetParsed('tasks');
         if (!tasks) { reply = '⚠️ No data found.'; }
         else {
           let found = false;
@@ -270,7 +271,7 @@ export default async function handler(req, res) {
             if (t) { t.done = true; found = true; break; }
           }
           if (found) {
-            await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+            await kvSet('tasks', tasks);
             reply = `✅ Task <code>${id}</code> marked as done. Dashboard will update within 30s.`;
           } else {
             reply = `⚠️ Task <code>${id}</code> not found.`;
@@ -286,7 +287,7 @@ export default async function handler(req, res) {
       const id = args[0];
       if (!id) { reply = '⚠️ Usage: <code>/undone t1</code>'; }
       else {
-        const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+        const tasks = await kvGetParsed('tasks');
         if (!tasks) { reply = '⚠️ No data found.'; }
         else {
           let found = false;
@@ -295,7 +296,7 @@ export default async function handler(req, res) {
             if (t) { t.done = false; found = true; break; }
           }
           if (found) {
-            await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+            await kvSet('tasks', tasks);
             reply = `↩️ Task <code>${id}</code> marked as not done.`;
           } else {
             reply = `⚠️ Task <code>${id}</code> not found.`;
@@ -325,7 +326,7 @@ else if (command === '/addtask') {
     reply += '• Chapter: "Tacloban task" → Rolf, "Iloilo" → Ted\n\n';
     reply += `<b>Team:</b>\n${teamListStr()}`;
   } else {
-    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+    const tasks = await kvGetParsed('tasks');
     if (!tasks) { reply = '⚠️ No dashboard data found.'; }
     else {
       if (!tasks.backlog) tasks.backlog = [];
@@ -385,7 +386,7 @@ Rules:
             created: new Date().toISOString()
           };
           tasks[priority].push(newTask);
-          await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+          await kvSet('tasks', tasks);
 
           const icon = priority === 'critical' ? '🔴' : priority === 'high' ? '🟠' : '🟡';
           reply  = `${icon} <b>Task added!</b>\n\n`;
@@ -411,7 +412,7 @@ Rules:
       const id = args[0];
       if (!id) { reply = '⚠️ Usage: <code>/deltask t5</code>'; }
       else {
-        const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+        const tasks = await kvGetParsed('tasks');
         if (!tasks) { reply = '⚠️ No data found.'; }
         else {
           let found = false;
@@ -424,7 +425,7 @@ Rules:
             }
           }
           if (found) {
-            await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+            await kvSet('tasks', tasks);
             reply = `🗑️ Task <code>${id}</code> deleted.`;
           } else {
             reply = `⚠️ Task <code>${id}</code> not found.`;
@@ -445,7 +446,7 @@ Rules:
         reply += '<b>By chapter:</b> <code>/mytasks Tacloban</code> · <code>/mytasks Cebu</code>\n';
         reply += '<b>By cohort:</b> <code>/mytasks cohort 3</code> · <code>/mytasks cohort 4</code>';
       } else {
-        const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+        const tasks = await kvGetParsed('tasks');
         if (!tasks) { reply = '⚠️ No data found.'; }
         else {
           if (!tasks.backlog) tasks.backlog = [];
@@ -549,7 +550,7 @@ Rules:
     // /risks
     // ════════════════════════════════════════
     else if (command === '/risks') {
-      const risks = await kvGetParsed('risks', KV_URL, KV_TOKEN);
+      const risks = await kvGetParsed('risks');
       if (!risks) { reply = '⚠️ No data found.'; }
       else {
         const open = risks.filter(r => r.status !== 'resolved');
@@ -575,13 +576,13 @@ Rules:
       const id = args[0];
       if (!id) { reply = '⚠️ Usage: <code>/resolve r4</code>'; }
       else {
-        const risks = await kvGetParsed('risks', KV_URL, KV_TOKEN);
+        const risks = await kvGetParsed('risks');
         if (!risks) { reply = '⚠️ No data found.'; }
         else {
           const r = risks.find(x => x.id === id);
           if (r) {
             r.status = r.status === 'resolved' ? 'open' : 'resolved';
-            await kvSet('risks', risks, KV_URL, KV_TOKEN);
+            await kvSet('risks', risks);
             reply = r.status === 'resolved'
               ? `✅ Risk <code>${id}</code> marked as resolved.`
               : `↩️ Risk <code>${id}</code> reopened.`;
@@ -596,7 +597,7 @@ Rules:
     // /budget
     // ════════════════════════════════════════
     else if (command === '/budget') {
-      const budget = await kvGetParsed('budget', KV_URL, KV_TOKEN);
+      const budget = await kvGetParsed('budget');
       if (!budget) { reply = '⚠️ No data found.'; }
       else {
         const lines = budget.filter(l => !l.vat);
@@ -623,14 +624,14 @@ Rules:
       if (!lineId || isNaN(amount)) {
         reply = '⚠️ Usage: <code>/updatespent b1 50000</code>';
       } else {
-        const budget = await kvGetParsed('budget', KV_URL, KV_TOKEN);
+        const budget = await kvGetParsed('budget');
         if (!budget) { reply = '⚠️ No data found.'; }
         else {
           const line = budget.find(l => l.id === lineId);
           if (line) {
             const old = line.spent;
             line.spent = amount;
-            await kvSet('budget', budget, KV_URL, KV_TOKEN);
+            await kvSet('budget', budget);
             reply  = `✅ <b>Budget updated!</b>\n\n`;
             reply += `Line ${line.num}: ${line.name}\n`;
             reply += `₱${old.toLocaleString()} → ₱${amount.toLocaleString()}\n`;
@@ -651,7 +652,7 @@ Rules:
         reply = '⚠️ Usage: <code>/update [natural language]</code>\n';
         reply += 'Example: <code>/update line 5 PR spent is now 62500</code>';
       } else {
-        const budget = await kvGetParsed('budget', KV_URL, KV_TOKEN);
+        const budget = await kvGetParsed('budget');
         if (!budget) { reply = '⚠️ No data found.'; }
         else {
           const anthropic = new Anthropic({ apiKey: CLAUDE_KEY });
@@ -671,7 +672,7 @@ Return: {"lineId":"b1","amount":50000}`,
             if (line && !isNaN(parsed.amount)) {
               const old = line.spent;
               line.spent = parsed.amount;
-              await kvSet('budget', budget, KV_URL, KV_TOKEN);
+              await kvSet('budget', budget);
               reply  = `✅ <b>Budget updated!</b>\n\n`;
               reply += `Line ${line.num}: ${line.name}\n`;
               reply += `₱${old.toLocaleString()} → ₱${parsed.amount.toLocaleString()}\n`;
@@ -691,9 +692,9 @@ Return: {"lineId":"b1","amount":50000}`,
     // ════════════════════════════════════════
     else if (command === '/status') {
       const [tasks, risks, chapters] = await Promise.all([
-        kvGetParsed('tasks', KV_URL, KV_TOKEN),
-        kvGetParsed('risks', KV_URL, KV_TOKEN),
-        kvGetParsed('chapters', KV_URL, KV_TOKEN),
+        kvGetParsed('tasks'),
+        kvGetParsed('risks'),
+        kvGetParsed('chapters'),
       ]);
       const days = Math.ceil((new Date('2026-06-30') - new Date()) / 864e5);
       const openCrit    = tasks ? (tasks.critical || []).filter(t => !t.done).length : '?';
@@ -728,10 +729,10 @@ Return: {"lineId":"b1","amount":50000}`,
         reply = '⚠️ Usage: <code>/ask [your question]</code>';
       } else {
         const [tasks, risks, chapters, budget] = await Promise.all([
-          kvGetParsed('tasks', KV_URL, KV_TOKEN),
-          kvGetParsed('risks', KV_URL, KV_TOKEN),
-          kvGetParsed('chapters', KV_URL, KV_TOKEN),
-          kvGetParsed('budget', KV_URL, KV_TOKEN),
+          kvGetParsed('tasks'),
+          kvGetParsed('risks'),
+          kvGetParsed('chapters'),
+          kvGetParsed('budget'),
         ]);
         const days = Math.ceil((new Date('2026-06-30') - new Date()) / 864e5);
         const ctx = `
@@ -760,7 +761,7 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
     // /dates
     // ════════════════════════════════════════
     else if (command === '/dates') {
-      const meetings = await kvGetParsed('meetings', KV_URL, KV_TOKEN) || [];
+      const meetings = await kvGetParsed('meetings') || [];
       const now = new Date();
       const upcoming = meetings
         .filter(m => new Date(m.isoDate) > new Date(now - 24*60*60*1000))
@@ -803,7 +804,7 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
         reply += '• <code>/adddate Jedd flying to Iloilo May 15, travel</code>\n\n';
         reply += '<b>Types:</b> meeting · deadline · event · fyi · travel';
       } else {
-        const meetings = await kvGetParsed('meetings', KV_URL, KV_TOKEN) || [];
+        const meetings = await kvGetParsed('meetings') || [];
         const anthropic = new Anthropic({ apiKey: CLAUDE_KEY });
         const response = await anthropic.messages.create({
           model: 'claude-sonnet-4-20250514',
@@ -854,7 +855,7 @@ Rules:
 
           meetings.push(newDate);
           meetings.sort((a, b) => new Date(a.isoDate) - new Date(b.isoDate));
-          await kvSet('meetings', meetings, KV_URL, KV_TOKEN);
+          await kvSet('meetings', meetings);
 
           const typeIcons = { meeting:'📅', deadline:'⏰', event:'📌', fyi:'💡', travel:'✈️' };
           const icon = typeIcons[newDate.type] || '📅';
@@ -893,7 +894,7 @@ Rules:
         reply += '• <code>/reschedule d1 Apr 28</code>\n';
         reply += '• <code>/reschedule d3 May 10 2pm</code>';
       } else {
-        const meetings = await kvGetParsed('meetings', KV_URL, KV_TOKEN) || [];
+        const meetings = await kvGetParsed('meetings') || [];
         const mtg = meetings.find(m => m.id === id);
         if (!mtg) {
           reply = `⚠️ Key date <code>${id}</code> not found. Use /dates to see all IDs.`;
@@ -918,7 +919,7 @@ Rules:
             const existingTime = mtg.isoDate.split('T')[1] || '00:00:00';
             mtg.isoDate = `${yr}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}T${existingTime}`;
             meetings.sort((a, b) => new Date(a.isoDate) - new Date(b.isoDate));
-            await kvSet('meetings', meetings, KV_URL, KV_TOKEN);
+            await kvSet('meetings', meetings);
             const newDateStr = new Date(mtg.isoDate).toLocaleDateString('en-PH', { weekday:'short', month:'short', day:'numeric' });
             reply  = `📅 <b>Rescheduled!</b>\n\n`;
             reply += `${mtg.title}\n`;
@@ -938,14 +939,14 @@ Rules:
       if (!id) {
         reply = '⚠️ Usage: <code>/removedate [id]</code>\n\nUse /dates to see all IDs.';
       } else {
-        const meetings = await kvGetParsed('meetings', KV_URL, KV_TOKEN) || [];
+        const meetings = await kvGetParsed('meetings') || [];
         const idx = meetings.findIndex(m => m.id === id);
         if (idx === -1) {
           reply = `⚠️ Key date <code>${id}</code> not found.`;
         } else {
           const title = meetings[idx].title;
           meetings.splice(idx, 1);
-          await kvSet('meetings', meetings, KV_URL, KV_TOKEN);
+          await kvSet('meetings', meetings);
           reply = `🗑️ Removed: <b>${title}</b> <code>${id}</code>`;
         }
       }
@@ -970,7 +971,7 @@ else if (command === '/edittask') {
     reply += '<i>To change deadline: /setdue [id] [date]</i>\n';
     reply += '<i>To change priority: /movetask [id] [priority]</i>';
   } else {
-    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+    const tasks = await kvGetParsed('tasks');
     if (!tasks) { reply = '⚠️ No dashboard data found.'; }
     else {
       if (!tasks.backlog) tasks.backlog = [];
@@ -989,7 +990,7 @@ else if (command === '/edittask') {
         foundTask.text   = newText;
         foundTask.edited = new Date().toISOString();
 
-        await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+        await kvSet('tasks', tasks);
 
         reply  = `✏️ <b>Task updated!</b>\n\n`;
         reply += `🆔 <code>${id}</code>\n\n`;
@@ -1017,7 +1018,7 @@ else if (command === '/edittask') {
         reply += '• <code>/setdue t9 Jun 1</code>\n\n';
         reply += '<i>If task is in backlog and new date is not overdue, it auto-restores to original priority.</i>';
       } else {
-        const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+        const tasks = await kvGetParsed('tasks');
         if (!tasks) { reply = '⚠️ No dashboard data found.'; }
         else {
           if (!tasks.backlog) tasks.backlog = [];
@@ -1042,7 +1043,7 @@ else if (command === '/edittask') {
               tasks.backlog = tasks.backlog.filter(t => t.id !== id);
               restored = true;
             }
-            await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+            await kvSet('tasks', tasks);
             reply  = `📅 <b>Due date updated!</b>\n\n`;
             reply += `🆔 <code>${id}</code> ${foundTask.text}\n`;
             reply += `👤 ${foundTask.assign || '—'}\n\n`;
@@ -1078,7 +1079,7 @@ else if (command === '/movetask') {
     reply += '• <code>/movetask t12 medium</code>\n';
     reply += '• <code>/movetask t8 backlog</code>';
   } else {
-    const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+    const tasks = await kvGetParsed('tasks');
     if (!tasks) { reply = '⚠️ No dashboard data found.'; }
     else {
       if (!tasks.backlog) tasks.backlog = [];
@@ -1109,7 +1110,7 @@ else if (command === '/movetask') {
 
         // Add to target
         tasks[target].push(foundTask);
-        await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+        await kvSet('tasks', tasks);
 
         const icons = { critical:'🔴', high:'🟠', medium:'🟡', backlog:'📦' };
         reply  = `${icons[target]} <b>Task moved!</b>\n\n`;
@@ -1136,7 +1137,7 @@ else if (command === '/movetask') {
         reply += '• <code>/reassign t3 Rejy Joash</code>\n\n';
         reply += `<b>Team:</b>\n${teamListStr()}`;
       } else {
-        const tasks = await kvGetParsed('tasks', KV_URL, KV_TOKEN);
+        const tasks = await kvGetParsed('tasks');
         if (!tasks) { reply = '⚠️ No dashboard data found.'; }
         else {
           if (!tasks.backlog) tasks.backlog = [];
@@ -1157,7 +1158,7 @@ else if (command === '/movetask') {
             const finalName  = matched || name;
             const oldAssign  = foundTask.assign || '—';
             foundTask.assign = finalName;
-            await kvSet('tasks', tasks, KV_URL, KV_TOKEN);
+            await kvSet('tasks', tasks);
             reply  = `👤 <b>Task reassigned!</b>\n\n`;
             reply += `🆔 <code>${id}</code> ${foundTask.text}\n\n`;
             reply += `From: <s>${oldAssign}</s>\n`;
