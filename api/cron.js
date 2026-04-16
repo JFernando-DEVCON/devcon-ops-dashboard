@@ -1,27 +1,21 @@
-const KV_URL   = process.env.KV_REST_API_URL;
-const KV_TOKEN = process.env.KV_REST_API_TOKEN;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
 const CRON_SECRET = process.env.CRON_SECRET;
 
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
 async function kvGet(key) {
   try {
-    const r = await fetch(`${KV_URL}/get/${key}`, {
-      headers: { Authorization: `Bearer ${KV_TOKEN}` }
-    });
-    const data = await r.json();
-    let parsed = data.result;
-    while (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch { break; }
-    }
-    if (Array.isArray(parsed)) parsed = parsed[0];
-    if (parsed && typeof parsed === 'object' && 'value' in parsed && Object.keys(parsed).length === 1) {
-      parsed = parsed.value;
-      while (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed); } catch { break; }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/kv_store?key=eq.${key}&select=value`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
       }
-    }
-    return parsed;
+    });
+    const rows = await r.json();
+    if (!rows || rows.length === 0) return null;
+    return rows[0].value;
   } catch { return null; }
 }
 
