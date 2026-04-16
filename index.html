@@ -528,7 +528,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
       <span class="card-title">AI DAILY BRIEF</span>
       <span style="font-family:var(--mono);font-size:9px;color:var(--dim)" id="brief-ts">not generated</span>
     </div>
-    <div style="padding:16px;font-family:var(--mono);font-size:12px;line-height:1.85;color:#8890aa;white-space:pre-wrap;word-break:break-word;min-height:80px" id="brief-body">Click "AI Briefing" to generate today's ops summary.</div>
+    <div style="padding:16px;font-family:var(--mono);font-size:12px;line-height:1.85;color:var(--sub);white-space:pre-wrap;word-break:break-word;min-height:80px" id="brief-body">Click "AI Briefing" to generate today's ops summary.</div>
   </div>
 
   <!-- Quick events -->
@@ -1046,9 +1046,9 @@ async function syncToServer() {
     });
     const d = await r.json();
     if (d.ok) {
-      console.log('✅ Synced to server at', new Date().toLocaleTimeString());
+      console.log(' Synced to server at', new Date().toLocaleTimeString());
       if (statusEl) {
-        statusEl.textContent = '✅ Saved ' + new Date().toLocaleTimeString();
+        statusEl.textContent = ' Saved ' + new Date().toLocaleTimeString();
         setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
       }
     } else {
@@ -1080,7 +1080,7 @@ async function loadTgCfg() {
     const d = await r.json();
     if (d.botToken) {
       document.getElementById('tg-token').value = d.botToken;
-      console.log('✅ Bot token loaded from server');
+      console.log(' Bot token loaded from server');
     }
   } catch (err) {
     console.warn('⚠ Could not load bot token:', err.message);
@@ -1133,7 +1133,7 @@ async function loadFromServer() {
     renderChapters();
     renderRisks();
     renderBudget();
-    console.log('✅ Loaded fresh data from server at', new Date().toLocaleTimeString());
+    console.log(' Loaded fresh data from server at', new Date().toLocaleTimeString());
   } catch (err) {
     console.warn('⚠ Could not load from server, using local data:', err.message);
     serverLoaded = true;
@@ -1145,7 +1145,7 @@ async function manualRefresh() {
   if (status) status.textContent = '⏳ Syncing...';
   await loadFromServer();
   if (status) {
-    status.textContent = '✅ Synced ' + new Date().toLocaleTimeString();
+    status.textContent = ' Synced ' + new Date().toLocaleTimeString();
     setTimeout(() => status.textContent = '', 4000);
   }
 }
@@ -1196,9 +1196,9 @@ function renderOverview() {
 
   // Events
   const events = [
-    {date:'Mar 28',name:'✅ Manila × Letran — Code Camp DONE',status:'COMPLETE',cls:'c-grn'},
-    {date:'Mar 28',name:'✅ Bayleaf — Media / Community Dinner DONE',status:'COMPLETE',cls:'c-grn'},
-    {date:'Mar 31',name:'✅ Tacloban Dry Run — DONE (date moved)',status:'DONE',cls:'c-grn'},
+    {date:'Mar 28',name:' Manila × Letran — Code Camp DONE',status:'COMPLETE',cls:'c-grn'},
+    {date:'Mar 28',name:' Bayleaf — Media / Community Dinner DONE',status:'COMPLETE',cls:'c-grn'},
+    {date:'Mar 31',name:' Tacloban Dry Run — DONE (date moved)',status:'DONE',cls:'c-grn'},
     {date:'Apr 18',name:'Iloilo × WVSU — SHEisDEVCON FWTF Summit (ABA)',status:'18 DAYS',cls:'c-blu'},
     {date:'May 6',name:'Bukidnon × BSU — Sui Move Code Camp',status:'36 DAYS',cls:'c-sub'},
     {date:'May 16',name:'Iloilo × CPU — Sui Code Camp #1 Iloilo',status:'46 DAYS',cls:'c-sub'},
@@ -1724,7 +1724,7 @@ function taskRow(t, realIdx, isDone) {
         ${filterAssignees
           ? `No tasks for selected filter`
           : prio === 'backlog'
-            ? '✅ No overdue tasks in backlog'
+            ? ' No overdue tasks in backlog'
             : 'No tasks'}
       </div>`;
     }
@@ -1988,7 +1988,7 @@ function renderChapters() {
   }).join('');
 
   // Update mini status icons
-  const icons = {ready:'⏳',ontrack:'📋',atrisk:'⚠️',pending:'📌',done:'✅'};
+  const icons = {ready:'⏳',ontrack:'📋',atrisk:'⚠️',pending:'📌',done:''};
   chapters.forEach(c=>{
     const el = document.getElementById('ch-stat-'+c.id);
     if(el) el.textContent = icons[c.status]||'📋';
@@ -2267,7 +2267,7 @@ function tgLog(msg,cls='info'){
   log.scrollTop=log.scrollHeight;
 }
 async function testTg(){
-  try{await tgPost('✅ <b>DEVCON OPS DASHBOARD</b>\n\nTelegram connected. Daily briefings active.');tgLog('✓ Test message sent','ok');}
+  try{await tgPost(' <b>DEVCON OPS DASHBOARD</b>\n\nTelegram connected. Daily briefings active.');tgLog('✓ Test message sent','ok');}
   catch(e){tgLog('✗ '+e.message,'err');}
 }
 async function findChatId(){
@@ -2310,7 +2310,7 @@ function buildDsuText(){
   }
 
   // Open tasks — all three priorities
-  msg += `✅ <b>OPEN TASKS (${totalActive} active)</b>\n`;
+  msg += ` <b>OPEN TASKS (${totalActive} active)</b>\n`;
   if(open.length){
     msg += `<b>🔴 Critical:</b>\n`;
     open.forEach(t=> msg += `• ${t.text} <i>(${t.assign})</i>\n`);
@@ -2329,7 +2329,7 @@ function buildDsuText(){
   msg += `📊 <b>KPI SNAPSHOT</b>\n`;
   msg += `Code Camps: <b>${doneCamps}/5</b> completed\n`;
   msg += `Days to Q2: <b>${days} days</b>\n`;
-  msg += `Grant: ✅ PAID ₱1,120,000\n`;
+  msg += `Grant:  PAID ₱1,120,000\n`;
   msg += `Open Risks: <b>${risks.filter(r=>r.status==='open').length}</b>\n\n`;
 
   // Upcoming camps — live from chapters data
@@ -2363,7 +2363,7 @@ async function sendCriticalOnly(){
 async function sendKpiSnapshot(){
   const days=Math.ceil((new Date('2026-06-30')-new Date())/864e5);
   const done=chapters.filter(c=>c.status==='done').length;
-  const msg=`📊 <b>DEVCON KPI SNAPSHOT</b>\n${new Date().toLocaleString('en-PH')}\n\n🏕 Code Camps: <b>${done}/5</b>\n📅 Q2 Deadline: <b>${days} days</b>\n💰 Grant: ✅ <b>₱1,120,000 PAID</b>\n⚠️ Open Risks: <b>${risks.filter(r=>r.status==='open').length}</b>\n📍 Next: Manila × Letran TODAY\n\n<i>DEVCON × Sui · Build Beyond</i>`;
+  const msg=`📊 <b>DEVCON KPI SNAPSHOT</b>\n${new Date().toLocaleString('en-PH')}\n\n🏕 Code Camps: <b>${done}/5</b>\n📅 Q2 Deadline: <b>${days} days</b>\n💰 Grant:  <b>₱1,120,000 PAID</b>\n⚠️ Open Risks: <b>${risks.filter(r=>r.status==='open').length}</b>\n📍 Next: Manila × Letran TODAY\n\n<i>DEVCON × Sui · Build Beyond</i>`;
   try{await tgPost(msg);tgLog('✓ KPI snapshot sent','ok');}
   catch(e){tgLog('✗ '+e.message,'err');}
 }
