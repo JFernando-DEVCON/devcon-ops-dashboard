@@ -153,7 +153,288 @@ function sevenDayDue() {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const body    = req.body;
+  const body = req.body;
+
+  // ── CALLBACK QUERY HANDLER (button taps) ──
+  if (body.callback_query) {
+    const cq      = body.callback_query;
+    const cqData  = cq.data || '';
+    const cqMsgId = cq.message.message_id;
+    const cqChat  = cq.message.chat.id;
+    const cqUser  = cq.from?.username || cq.from?.first_name || 'unknown';
+
+    async function answerCQ(text = '') {
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callback_query_id: cq.id, text })
+      });
+    }
+
+    async function editCQ(text, markup = null) {
+      const b = {
+        chat_id: cqChat,
+        message_id: cqMsgId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true
+      };
+      if (markup) b.reply_markup = markup;
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(b)
+      });
+    }
+
+    // ── TASKS FILTER BUTTONS ──
+    if (cqData.startsWith('tasks_')) {
+      const filter = cqData.replace('tasks_', '');
+      const tasks  = await kvGetParsed('tasks');
+      if (!tasks) { await answerCQ('No data found'); return res.status(200).end(); }
+      if (!tasks.backlog) tasks.backlog = [];
+
+      const labels = { critical:'🔴 Critical', high:'🟠 High', medium:'🟡 This Week', backlog:'📦 Backlog', all:'All' };
+      const markup = { inline_keyboard: [[
+        { text: filter === 'critical' ? '● Critical' : '🔴 Critical', callback_data: 'tasks_critical' },
+        { text: filter === 'high'     ? '● High'     : '🟠 High',     callback_data: 'tasks_high' },
+      ],[
+        { text: filter === 'medium'   ? '● This Week' : '🟡 This Week', callback_data: 'tasks_medium' },
+        { text: filter === 'backlog'  ? '● Backlog'   : '📦 Backlog',   callback_data: 'tasks_backlog' },
+      ],[
+        { text: filter === 'all'      ? '● All Tasks' : 'All Tasks',    callback_data: 'tasks_all' },
+      ]]};
+
+      const prios = filter === 'all' ? ['critical','high','medium','backlog'] : [filter];
+      let txt = `📋 <b>TASKS — ${labels[filter] || 'All'}</b>\n\n`;
+      let total = 0;
+      prios.forEach(prio => {
+        const items = (tasks[prio] || []).filter(t => !t.done);
+        if (!items.length) return;
+        const icon = { critical:'🔴', high:'🟠', medium:'🟡', backlog:'📦' }[prio];
+        txt += `${icon} <b>${prio.toUpperCase()} (${items.length})</b>\n`;
+        items.forEach(t => {
+          txt += `  <code>${t.id}</code> ${t.text}\n`;
+          txt += `  👤 ${t.assign || '—'}${t.due ? ` · ${t.due}` : ''}\n`;
+        });
+        txt += '\n';
+        total += items.length;
+      });
+      if (total === 0) txt += 'No open tasks in this category.';
+      txt += `<i>Tap a filter to switch view</i>`;
+
+      await answerCQ();
+      await editCQ(txt, markup);
+      return res.status(200).end();
+    }
+
+    // ── MYTASKS FILTER BUTTONS ──
+    if (cqData.startsWith('mytasks_')) {
+      const filter = cqData.replace('mytasks_', '');
+      const tasks  = await kvGetParsed('tasks');
+      if (!tasks) { await answerCQ('No data found'); return res.status(200).end(); }
+      if (!tasks.backlog) tasks.backlog = [];
+
+      const TEAM_LOCAL = {
+        hq: ['Dom', 'Michael Lance', 'Jedd', 'Marica', 'RJ'],
+        chapters: ['Precious','Rolf','Ted','Zhi','Danmel','Rejy Joash','JP Remar Serrano','Sab','Sabrinah','Christian Jake Geonzon','Reyche'],
+        interns_c3: ['Lady','Kien','Kenshin','Allyza'],
+        interns_c4: ['Clayton','Dale','Zendy'],
+      };
+
+      const filterMap = {
+        hq:         { names: TEAM_LOCAL.hq,         label: '🏢 HQ' },
+        chapters:   { names: TEAM_LOCAL.chapters,    label: '🗺️ Chapters' },
+        interns_c3: { names: TEAM_LOCAL.interns_c3,  label: '🎓 Cohort 3' },
+        interns_c4: { names: TEAM_LOCAL.interns_c4,  label: '🎓 Cohort 4' },
+      };
+
+      const markup = { inline_keyboard: [[
+        { text: filter === 'hq'         ? '● HQ'       : '🏢 HQ',       callback_data: 'mytasks_hq' },
+        { text: filter === 'chapters'   ? '● Chapters'  : '🗺️ Chapters', callback_data: 'mytasks_chapters' },
+      ],[
+        { text: filter === 'interns_c3' ? '● Cohort 3'  : '🎓 Cohort 3', callback_data: 'mytasks_interns_c3' },
+        { text: filter === 'interns_c4' ? '● Cohort 4'  : '🎓 Cohort 4', callback_data: 'mytasks_interns_c4' },
+      ]]};
+
+      const { names, label } = filterMap[filter] || filterMap.hq;
+      const allOpen = [
+        ...(tasks.critical || []),
+        ...(tasks.high     || []),
+        ...(tasks.medium   || []),
+        ...(tasks.backlog  || []),
+      ].filter(t => !t.done);
+
+      const myTasks = allOpen.filter(t =>
+        names.some(n =>
+          (t.assign || '').toLowerCase().includes(n.toLowerCase().split(' ')[0]) ||
+          n.toLowerCase().includes((t.assign || '').toLowerCase().split(' ')[0])
+        )
+      );
+
+      let txt = `👥 <b>TASKS — ${label}</b>\n\n`;
+      if (!myTasks.length) {
+        txt += 'No open tasks for this group.';
+      } else {
+        myTasks.forEach(t => {
+          const prio = (tasks.critical || []).find(x => x.id === t.id) ? '🔴'
+            : (tasks.high || []).find(x => x.id === t.id) ? '🟠'
+            : (tasks.medium || []).find(x => x.id === t.id) ? '🟡' : '📦';
+          txt += `${prio} <code>${t.id}</code> ${t.text}\n`;
+          txt += `   👤 ${t.assign || '—'}${t.due ? ` · ${t.due}` : ''}\n`;
+        });
+      }
+      txt += `\n<i>Tap a group to switch view</i>`;
+
+      await answerCQ();
+      await editCQ(txt, markup);
+      return res.status(200).end();
+    }
+
+    // ── RISKS FILTER BUTTONS ──
+    if (cqData.startsWith('risks_')) {
+      const filter = cqData.replace('risks_', '');
+      const risks  = await kvGetParsed('risks');
+      if (!risks) { await answerCQ('No data found'); return res.status(200).end(); }
+
+      const markup = { inline_keyboard: [[
+        { text: filter === 'open' ? '● Open Only' : 'Open Only', callback_data: 'risks_open' },
+        { text: filter === 'all'  ? '● All Risks' : 'All Risks', callback_data: 'risks_all' },
+      ]]};
+
+      const filtered = filter === 'open' ? risks.filter(r => r.status !== 'resolved') : risks;
+      const order = { critical:0, high:1, medium:2, low:3 };
+      filtered.sort((a,b) => (order[a.sev]||9) - (order[b.sev]||9));
+
+      let txt = `⚠️ <b>RISKS — ${filter === 'open' ? 'Open Only' : 'All'} (${filtered.length})</b>\n\n`;
+      if (!filtered.length) {
+        txt += 'No risks found.';
+      } else {
+        filtered.forEach(r => {
+          const icon = r.sev === 'critical' ? '🔴' : r.sev === 'high' ? '🟠' : r.sev === 'medium' ? '🟡' : '🟢';
+          const status = r.status === 'resolved' ? ' ✓' : '';
+          txt += `${icon} <b>${r.title}</b>${status}\n`;
+          txt += `   → ${r.action}\n`;
+          txt += `   👤 ${r.owner} · <code>${r.id}</code>\n\n`;
+        });
+      }
+      txt += `<i>Tap a filter to switch view</i>`;
+
+      await answerCQ();
+      await editCQ(txt, markup);
+      return res.status(200).end();
+    }
+
+    // ── DATES FILTER BUTTONS ──
+    if (cqData.startsWith('dates_')) {
+      const filter   = cqData.replace('dates_', '');
+      const meetings = await kvGetParsed('meetings') || [];
+      const now      = new Date();
+      const upcoming = meetings
+        .filter(m => new Date(m.isoDate) > new Date(now - 24*60*60*1000))
+        .sort((a,b) => new Date(a.isoDate) - new Date(b.isoDate));
+
+      const typeIcons = { meeting:'📅', deadline:'⏰', event:'📌', fyi:'💡', travel:'✈️', all:'All' };
+      const markup = { inline_keyboard: [[
+        { text: filter === 'all'      ? '● All'      : 'All',       callback_data: 'dates_all' },
+        { text: filter === 'meeting'  ? '● Meeting'  : '📅 Meeting', callback_data: 'dates_meeting' },
+        { text: filter === 'deadline' ? '● Deadline' : '⏰ Deadline',callback_data: 'dates_deadline' },
+      ],[
+        { text: filter === 'event'    ? '● Event'    : '📌 Event',   callback_data: 'dates_event' },
+        { text: filter === 'fyi'      ? '● FYI'      : '💡 FYI',     callback_data: 'dates_fyi' },
+        { text: filter === 'travel'   ? '● Travel'   : '✈️ Travel',  callback_data: 'dates_travel' },
+      ]]};
+
+      const filtered = filter === 'all' ? upcoming : upcoming.filter(m => m.type === filter);
+      let txt = `📅 <b>KEY DATES — ${filter === 'all' ? 'All' : filter.toUpperCase()} (${filtered.length})</b>\n\n`;
+
+      if (!filtered.length) {
+        txt += 'No dates found for this filter.';
+      } else {
+        filtered.forEach(m => {
+          const date   = new Date(m.isoDate);
+          const dateStr = date.toLocaleDateString('en-PH', { month:'short', day:'numeric' });
+          const today  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const dDate  = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+          const diff   = Math.round((dDate - today) / 864e5);
+          const countdown = diff === 0 ? '🔴 TODAY' : diff === 1 ? '🟠 TOMORROW' : `📆 in ${diff} days`;
+          const icon   = typeIcons[m.type] || '📅';
+          txt += `${icon} <b>${m.title}</b>\n`;
+          txt += `   ${dateStr} · ${countdown} · <code>${m.id}</code>\n`;
+          if (m.notes) txt += `   <i>${m.notes}</i>\n`;
+          txt += '\n';
+        });
+      }
+      txt += `<i>Tap a filter to switch view</i>`;
+
+      await answerCQ();
+      await editCQ(txt, markup);
+      return res.status(200).end();
+    }
+
+    // ── STATUS ACTION BUTTONS ──
+    if (cqData.startsWith('status_')) {
+      const action = cqData.replace('status_', '');
+      const tasks  = await kvGetParsed('tasks');
+      const risks  = await kvGetParsed('risks');
+      const budget = await kvGetParsed('budget');
+
+      const markup = { inline_keyboard: [[
+        { text: action === 'tasks'  ? '● Tasks'  : 'Tasks',  callback_data: 'status_tasks' },
+        { text: action === 'risks'  ? '● Risks'  : 'Risks',  callback_data: 'status_risks' },
+        { text: action === 'budget' ? '● Budget' : 'Budget', callback_data: 'status_budget' },
+      ]]};
+
+      let txt = '';
+
+      if (action === 'tasks' && tasks) {
+        if (!tasks.backlog) tasks.backlog = [];
+        const crit = (tasks.critical || []).filter(t => !t.done);
+        const high = (tasks.high     || []).filter(t => !t.done);
+        const med  = (tasks.medium   || []).filter(t => !t.done);
+        const back = (tasks.backlog  || []).filter(t => !t.done);
+        txt  = `📋 <b>OPEN TASKS</b>\n\n`;
+        txt += `🔴 Critical: <b>${crit.length}</b>\n`;
+        crit.slice(0,3).forEach(t => txt += `  • ${t.text} <i>(${t.assign})</i>\n`);
+        txt += `\n🟠 High: <b>${high.length}</b>\n`;
+        high.slice(0,3).forEach(t => txt += `  • ${t.text} <i>(${t.assign})</i>\n`);
+        txt += `\n🟡 This Week: <b>${med.length}</b>\n`;
+        txt += `\n📦 Backlog: <b>${back.length}</b>\n`;
+      } else if (action === 'risks' && risks) {
+        const open = risks.filter(r => r.status !== 'resolved');
+        const order = { critical:0, high:1, medium:2, low:3 };
+        open.sort((a,b) => (order[a.sev]||9) - (order[b.sev]||9));
+        txt = `⚠️ <b>OPEN RISKS (${open.length})</b>\n\n`;
+        open.slice(0,6).forEach(r => {
+          const icon = r.sev === 'critical' ? '🔴' : r.sev === 'high' ? '🟠' : '🟡';
+          txt += `${icon} ${r.title}\n   → ${r.action}\n\n`;
+        });
+      } else if (action === 'budget' && budget) {
+        const lines = budget.filter(l => !l.vat);
+        const total = lines.reduce((s,l) => s + l.spent, 0);
+        txt  = `💰 <b>BUDGET SUMMARY</b>\n\n`;
+        txt += `Spent: ₱${total.toLocaleString()} / ₱1,000,000\n`;
+        txt += `Remaining: ₱${(1000000 - total).toLocaleString()}\n\n`;
+        lines.forEach(l => {
+          const pct = Math.round(l.spent / l.alloc * 100);
+          const bar = pct >= 100 ? '🔴' : pct >= 80 ? '🟠' : '🟢';
+          txt += `${bar} Line ${l.num}: ₱${l.spent.toLocaleString()} / ₱${l.alloc.toLocaleString()} (${pct}%)\n`;
+        });
+      } else {
+        txt = '⚠️ No data found.';
+      }
+
+      txt += `\n<i>Tap a section to switch view</i>`;
+      await answerCQ();
+      await editCQ(txt, markup);
+      return res.status(200).end();
+    }
+
+    await answerCQ();
+    return res.status(200).end();
+  }
+
+  // ── REGULAR MESSAGE HANDLER ──
   const message = body.message || body.channel_post;
   if (!message || !message.text) return res.status(200).end();
 
@@ -174,18 +455,47 @@ export default async function handler(req, res) {
 
   let reply = '';
 
-  // ── SEND REPLY HELPER ──
-  async function sendReply(text) {
+  
+// ── SEND REPLY HELPER ──
+  async function sendReply(text, markup = null) {
+    const body = {
+      chat_id: chatId,
+      text: text || reply,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      reply_to_message_id: message.message_id
+    };
+    if (markup) body.reply_markup = markup;
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text || reply,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        reply_to_message_id: message.message_id
-      })
+      body: JSON.stringify(body)
+    });
+  }
+
+  // ── EDIT MESSAGE HELPER ──
+  async function editMessage(msgId, text, markup = null) {
+    const body = {
+      chat_id: chatId,
+      message_id: msgId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true
+    };
+    if (markup) body.reply_markup = markup;
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  }
+
+  // ── ANSWER CALLBACK HELPER ──
+  async function answerCallback(callbackId, text = '') {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackId, text })
     });
   }
 
@@ -251,6 +561,17 @@ export default async function handler(req, res) {
         }
         if (total === 0) reply = '✅ No open tasks. All clear!';
       }
+      const tasksMarkup = { inline_keyboard: [[
+        { text: '🔴 Critical', callback_data: 'tasks_critical' },
+        { text: '🟠 High',     callback_data: 'tasks_high' },
+      ],[
+        { text: '🟡 This Week', callback_data: 'tasks_medium' },
+        { text: '📦 Backlog',   callback_data: 'tasks_backlog' },
+      ],[
+        { text: 'All Tasks', callback_data: 'tasks_all' },
+      ]]};
+      await sendReply(reply, tasksMarkup);
+      return res.status(200).end();
     }
 
     // ════════════════════════════════════════
@@ -504,6 +825,15 @@ Rules:
 
           if (total === 0) {
             reply = `✅ <b>${filterLabel}</b>\n\nNo open tasks. All clear!`;
+            const mytasksMarkup = { inline_keyboard: [[
+            { text: '🏢 HQ',       callback_data: 'mytasks_hq' },
+            { text: '🗺️ Chapters', callback_data: 'mytasks_chapters' },
+          ],[
+            { text: '🎓 Cohort 3', callback_data: 'mytasks_interns_c3' },
+            { text: '🎓 Cohort 4', callback_data: 'mytasks_interns_c4' },
+          ]]};
+          await sendReply(reply, mytasksMarkup);
+          return res.status(200).end();
           } else {
             reply = `📋 <b>${filterLabel}</b> — ${total} open task${total > 1 ? 's' : ''}\n\n`;
             if (critical.length) {
@@ -540,6 +870,15 @@ Rules:
             }
             reply += `<i>Use /done [id] to mark complete</i>`;
           }
+          const mytasksMarkup = { inline_keyboard: [[
+            { text: '🏢 HQ',       callback_data: 'mytasks_hq' },
+            { text: '🗺️ Chapters', callback_data: 'mytasks_chapters' },
+          ],[
+            { text: '🎓 Cohort 3', callback_data: 'mytasks_interns_c3' },
+            { text: '🎓 Cohort 4', callback_data: 'mytasks_interns_c4' },
+          ]]};
+          await sendReply(reply, mytasksMarkup);
+          return res.status(200).end();
         }
       }
     }
@@ -565,6 +904,12 @@ Rules:
           });
         }
       }
+      const risksMarkup = { inline_keyboard: [[
+        { text: 'Open Only', callback_data: 'risks_open' },
+        { text: 'All Risks', callback_data: 'risks_all' },
+      ]]};
+      await sendReply(reply, risksMarkup);
+      return res.status(200).end();
     }
 
     // ════════════════════════════════════════
@@ -713,6 +1058,13 @@ Return: {"lineId":"b1","amount":50000}`,
       reply += `  🟡 This Week: ${openMed}\n`;
       reply += `  📦 Backlog: ${openBacklog}\n\n`;
       reply += `⚠️ Open Risks: <b>${openRisks}</b>`;
+      const statusMarkup = { inline_keyboard: [[
+        { text: 'Tasks',  callback_data: 'status_tasks' },
+        { text: 'Risks',  callback_data: 'status_risks' },
+        { text: 'Budget', callback_data: 'status_budget' },
+      ]]};
+      await sendReply(reply, statusMarkup);
+      return res.status(200).end();
     }
 
     // ════════════════════════════════════════
@@ -767,6 +1119,8 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
 
       if (!upcoming.length) {
         reply = '📅 <b>KEY DATES</b>\n\nNo upcoming dates. Add one with /adddate';
+        await sendReply(reply);
+      return res.status(200).end();
       } else {
         reply = `📅 <b>KEY DATES (${upcoming.length})</b>\n\n`;
         upcoming.forEach(m => {
@@ -784,6 +1138,17 @@ DEVCON Philippines × Sui Foundation MOU 2026 Ops Context:
           reply += '\n';
         });
         reply += `<i>Use /adddate, /reschedule [id] [date], /removedate [id]</i>`;
+        const datesMarkup = { inline_keyboard: [[
+        { text: 'All',        callback_data: 'dates_all' },
+        { text: '📅 Meeting', callback_data: 'dates_meeting' },
+        { text: '⏰ Deadline',callback_data: 'dates_deadline' },
+      ],[
+        { text: '📌 Event',   callback_data: 'dates_event' },
+        { text: '💡 FYI',     callback_data: 'dates_fyi' },
+        { text: '✈️ Travel',  callback_data: 'dates_travel' },
+      ]]};
+      await sendReply(reply, datesMarkup);
+      return res.status(200).end();
       }
     }
 
