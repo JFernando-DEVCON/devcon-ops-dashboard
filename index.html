@@ -420,7 +420,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <!-- ── PASSWORD GATE ── -->
 <div id="pw-gate">
   <div class="pw-box">
-    <div class="pw-logo">DEVCON<br><span>OPS DASHBOARD</span></div>
+    <img class="pw-logo-img" src="https://raw.githubusercontent.com/JFernando-DEVCON/devcon-ops-dashboard/main/public/devcon-logo-white.png" alt="DEVCON" onerror="this.style.display='none'">
     <div class="pw-sub">Sui × MOU 2026 · Restricted Access</div>
     <input class="pw-input" id="pw-input" type="password" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()">
     <div class="pw-err" id="pw-err"></div>
@@ -751,6 +751,35 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <div id="dates-list"></div>
   </div>
 </div>
+
+
+<!-- ─── GRANT SCOUT ─── -->
+<div class="page" id="page-scout">
+  <div class="pg-header">
+    <div>
+      <div class="pg-title">Grant Scout</div>
+      <div class="pg-sub">AI-POWERED FUNDING OPPORTUNITIES · AUTO-RUNS EVERY MONDAY 10AM PHT</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--dim)" id="scout-last-run">Never run</span>
+      <button class="btn btn-ghost btn-sm" onclick="loadScoutGrants()">REFRESH</button>
+    </div>
+  </div>
+
+  <div class="stat-row" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat"><div class="stat-lbl">Total Grants</div><div class="stat-val c-acc" id="scout-stat-total">—</div><div class="stat-hint">found this week</div></div>
+    <div class="stat"><div class="stat-lbl">High Match</div><div class="stat-val c-grn" id="scout-stat-high">—</div><div class="stat-hint">score 80+</div></div>
+    <div class="stat"><div class="stat-lbl">Last Scout</div><div class="stat-val" id="scout-stat-date" style="font-size:16px;color:var(--sub)">—</div><div class="stat-hint">auto-runs Monday</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">FUNDING OPPORTUNITIES</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--dim)">Powered by Claude AI · Verify before applying</span>
+    </div>
+    <div id="scout-list"></div>
+  </div>
+</div>
   
 <!-- ─── BOT LOGS ─── -->
 <div class="page" id="page-logs">
@@ -796,6 +825,69 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <div class="modal-overlay" id="modal-overlay"></div>  
   
 <script>
+
+// ══════════════════════════════════════════════════════════════
+// GRANT SCOUT
+// ══════════════════════════════════════════════════════════════
+async function loadScoutGrants() {
+  try {
+    const r = await fetch('/api/get?key=scout_grants');
+    const d = await r.json();
+    if (d.data && d.data.grants) {
+      renderScoutGrants(d.data);
+    } else {
+      document.getElementById('scout-list').innerHTML =
+        '<div class="grant-empty">No grant data yet.<br>Run <code>/scout</code> in Telegram or wait for Monday\'s auto-run.</div>';
+    }
+  } catch(e) {
+    document.getElementById('scout-list').innerHTML =
+      '<div class="grant-empty">Failed to load grant data.</div>';
+  }
+}
+
+function renderScoutGrants(data) {
+  const grants = data.grants || [];
+  const genAt  = data.generated_at;
+
+  if (genAt) {
+    const d = new Date(genAt);
+    document.getElementById('scout-last-run').textContent =
+      d.toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'});
+    document.getElementById('scout-stat-date').textContent =
+      d.toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'});
+  }
+
+  document.getElementById('scout-stat-total').textContent = grants.length || '—';
+  document.getElementById('scout-stat-high').textContent  = grants.filter(g => g.score >= 80).length || '—';
+
+  if (!grants.length) {
+    document.getElementById('scout-list').innerHTML =
+      '<div class="grant-empty">No grants found. Run /scout in Telegram to search.</div>';
+    return;
+  }
+
+  document.getElementById('scout-list').innerHTML = grants.map(g => {
+    const scoreClass = g.score >= 80 ? 'high' : g.score >= 60 ? 'mid' : 'low';
+    return `
+    <div class="grant-row">
+      <div class="grant-score ${scoreClass}">
+        <div class="grant-score-val">${g.score}</div>
+        <div class="grant-score-lbl">match</div>
+      </div>
+      <div class="grant-body">
+        <div class="grant-name">${g.name}</div>
+        <div class="grant-funder">${g.funder}</div>
+        <div class="grant-meta">
+          <span class="grant-amount">${g.amount}</span>
+          <span class="grant-deadline">Due: ${g.deadline}</span>
+        </div>
+        <div class="grant-relevance">${g.relevance}</div>
+      </div>
+      <a class="grant-link" href="${g.link}" target="_blank" rel="noopener">APPLY →</a>
+    </div>`;
+  }).join('');
+}
+
 // ══════════════════════════════════════════════════════════════
 // DATA — seeded from project context
 // ══════════════════════════════════════════════════════════════
@@ -1087,6 +1179,7 @@ if(page==='tasks')    renderTasks();
   if(page==='overview') renderOverview();
   if(page==='logs')     loadBotLogs();
   if(page==='dates')    renderDates();
+  if(page==='scout') loadScoutGrants();
 }
 
 // ══════════════════════════════════════════════════════════════
