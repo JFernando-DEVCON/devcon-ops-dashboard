@@ -433,37 +433,73 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <!-- ═══ SIDEBAR ═══ -->
 <aside class="sidebar">
   <div class="logo">
-    <div class="logo-tag">DEVCON PH</div>
-    <div class="logo-name">OPS<br>DASHBOARD</div>
-    <div class="logo-sub">SUI × MOU 2026</div>
+    <div class="logo-tag">MOU 2026</div>
+    <img class="logo-img" src="https://raw.githubusercontent.com/JFernando-DEVCON/devcon-ops-dashboard/main/public/devcon-logo-white.png" alt="DEVCON" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+    <div style="display:none;font-family:var(--hdg);font-size:22px;font-weight:700;color:var(--txt);letter-spacing:-.02em;margin-bottom:6px">DEVCON</div>
+    <div class="logo-sub">OPS DASHBOARD · SUI × MOU 2026</div>
   </div>
 
   <div class="nav-section">
-    <span class="nav-label">Navigation</span>
-    <button class="nav-item active" onclick="nav('overview')"><span class="icon">🏠</span>Overview<span class="nav-badge warn" id="nb-overview">—</span></button>
-    <button class="nav-item" onclick="nav('tasks')"><span class="icon">✅</span>National Tasks<span class="nav-badge" id="nb-tasks">—</span></button>
-    <button class="nav-item" onclick="nav('chapters')"><span class="icon">🗺️</span>Chapter Tracker<span class="nav-badge ok" id="nb-chapters">5</span></button>
-    <button class="nav-item" onclick="nav('budget')"><span class="icon">💰</span>Budget<span class="nav-badge warn" id="nb-budget">!</span></button>
-    <button class="nav-item" onclick="nav('risks')"><span class="icon">⚠️</span>Risks<span class="nav-badge" id="nb-risks">—</span></button>
+    <span class="nav-label">Operations</span>
+    <button class="nav-item active" onclick="nav('overview')">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>
+      Overview
+      <span class="nav-badge warn" id="nb-overview">—</span>
+    </button>
+    <button class="nav-item" onclick="nav('tasks')">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+      National Tasks
+      <span class="nav-badge" id="nb-tasks">—</span>
+    </button>
+    <button class="nav-item" onclick="nav('chapters')">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
+      Chapter Tracker
+      <span class="nav-badge ok" id="nb-chapters">5</span>
+    </button>
+    <button class="nav-item" onclick="nav('budget')">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+      Budget
+      <span class="nav-badge warn" id="nb-budget">!</span>
+    </button>
+    <button class="nav-item" onclick="nav('risks')">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+      Risks
+      <span class="nav-badge" id="nb-risks">—</span>
+    </button>
   </div>
 
-  <div class="nav-section" style="margin-top:8px">
-    <span class="nav-label">Daily Brief</span>
-  <button class="nav-item" onclick="nav('dates')"><span class="icon">📅</span>Key Dates<span class="nav-badge ok" id="nb-dates" style="background:var(--s3);color:var(--sub)">—</span></button>
-  <button class="nav-item" onclick="nav('telegram')"><span class="icon">✈️</span>Telegram Notify</button>
-  <button class="nav-item" onclick="nav('logs')"><span class="icon">🔍</span>Bot Logs<span class="nav-badge ok" id="nb-logs" style="background:var(--s3);color:var(--sub)">—</span></button>
+  <div class="nav-section" style="margin-top:6px">
+    <span class="nav-label">Tools</span>
+    <button class="nav-item" onclick="nav('dates')">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+      Key Dates
+      <span class="nav-badge ok" id="nb-dates" style="background:var(--s3);color:var(--sub)">—</span>
+    </button>
+    <button class="nav-item" onclick="nav('scout')">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></span>
+      Grant Scout
+    </button>
+    <button class="nav-item" onclick="nav('telegram')">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span>
+      Telegram Notify
+    </button>
+    <button class="nav-item" onclick="nav('logs')">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+      Bot Logs
+      <span class="nav-badge ok" id="nb-logs" style="background:var(--s3);color:var(--sub)">—</span>
+    </button>
   </div>
 
-<div class="sidebar-footer">
-  <div class="clock-box">
-    <div style="font-size:11px;letter-spacing:1px;margin-bottom:4px;color:var(--sub)">LOCAL TIME</div>
-    <div class="clock-val" id="clock">--:--:--</div>
+  <div class="sidebar-footer">
+    <div class="clock-box">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:1.5px;margin-bottom:4px;color:var(--dim);text-transform:uppercase">Local Time</div>
+      <div class="clock-val" id="clock">--:--:--</div>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--sub);margin-top:5px" id="date-lbl"></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:2px">Q2 Deadline: Jun 30</div>
+    <button onclick="manualRefresh()" style="margin-top:10px;width:100%;background:transparent;border:1px solid var(--bdr);border-radius:5px;padding:6px;font-family:var(--mono);font-size:9px;color:var(--dim);cursor:pointer;letter-spacing:1px;transition:all .15s" onmouseover="this.style.borderColor='var(--dv-green)';this.style.color='var(--dv-green)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'">SYNC DASHBOARD</button>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:4px;text-align:center" id="sync-status"></div>
   </div>
-  <div style="font-family:var(--mono);font-size:11px;color:var(--sub);margin-top:6px" id="date-lbl"></div>
-  <div style="font-family:var(--mono);font-size:11px;color:var(--sub);margin-top:2px">Q2 Deadline: Jun 30</div>
-  <button onclick="manualRefresh()" style="margin-top:10px;width:100%;background:transparent;border:1px solid var(--bdr);border-radius:6px;padding:6px;font-family:var(--mono);font-size:9px;color:var(--dim);cursor:pointer;letter-spacing:1px;transition:all .15s" onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'">🔄 SYNC DASHBOARD</button>
-  <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:4px;text-align:center" id="sync-status"></div>
-</div>
 </aside>
 
 <!-- ═══ MAIN ═══ -->
