@@ -1223,27 +1223,98 @@ else if (command === '/movetask') {
 // ════════════════════════════════════════
     // /scout
     // ════════════════════════════════════════
-    else if (command === '/scout') {
+else if (command === '/scout') {
       reply = `🔍 <b>Grant Scout running...</b>\n\nSearching for funding opportunities for DEVCON PH. This may take 15-20 seconds.\n\n<i>Results will be posted to this chat shortly.</i>`;
       await sendReply(reply);
 
       try {
-        const r = await fetch(
-          `${process.env.VERCEL_URL
-            ? 'https://' + process.env.VERCEL_URL
-            : 'https://devcon-ops-dashboard.vercel.app'}/api/scout`,
-          {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` }
-          }
-        );
-        const d = await r.json();
-        if (!d.ok) {
-          await sendReply(`⚠️ Scout error: ${d.error || 'Unknown error'}`);
+        const anthropic = new Anthropic({ apiKey: CLAUDE_KEY });
+        const now = new Date().toLocaleDateString('en-PH', {
+          weekday: 'long', year: 'numeric',
+          month: 'long', day: 'numeric',
+          timeZone: 'Asia/Manila'
+        });
+
+        const scoutResponse = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          system: `You are a grants research assistant for DEVCON Philippines, a registered non-profit tech community organization.
+Return ONLY valid JSON, no markdown, no backticks, no explanation.
+Return exactly this structure:
+{
+  "grants": [
+    {
+      "name": "Grant name",
+      "funder": "Organization providing the grant",
+      "amount": "Amount range or TBD",
+      "deadline": "Deadline date or Rolling",
+      "link": "Application URL",
+      "relevance": "1-2 sentences why this fits DEVCON PH",
+      "score": 85
+    }
+  ]
+}
+Rules:
+- Find 8 currently open grants relevant to DEVCON Philippines
+- Focus on: AI education, web3/blockchain, tech community building, gender in tech, digital literacy, youth tech programs
+- Priority funders: Sui Foundation, USAID, DOST, Google.org, Meta, Microsoft, Gitcoin, UNDP, ADB, Asian foundations
+- Philippine non-profits or Southeast Asia eligible
+- Score 0-100 based on fit with DEVCON mission
+- Sort by score descending
+- If not certain of a specific active grant, note "Verify availability" in deadline field`,
+          messages: [{
+            role: 'user',
+            content: `Today is ${now}. Find the best currently open grants for DEVCON Philippines — a non-profit tech community with 10 chapters nationwide running code camps, SHEisDEVCON gender programs, and AI/blockchain education. We have a Sui Foundation partnership.`
+          }]
+        });
+
+        let grants = [];
+        try {
+          const parsed = JSON.parse(scoutResponse.content[0].text.trim());
+          grants = parsed.grants || [];
+        } catch {
+          await sendReply('⚠️ Could not parse grant results. Try again.');
+          return res.status(200).end();
         }
+
+        if (!grants.length) {
+          await sendReply('⚠️ No grants found this week.');
+          return res.status(200).end();
+        }
+
+        // Save to Supabase
+        await kvSet('scout_grants', {
+          generated_at: new Date().toISOString(),
+          grants
+        });
+
+        // Build and send results
+        const dateStr = new Date().toLocaleDateString('en-PH', {
+          month: 'short', day: 'numeric', year: 'numeric',
+          timeZone: 'Asia/Manila'
+        });
+
+        let scoutMsg = `🔍 <b>DEVCON GRANT SCOUT — ${dateStr}</b>\n`;
+        scoutMsg += `<i>Weekly funding opportunities for DEVCON PH</i>\n\n`;
+
+        grants.slice(0, 8).forEach((g, i) => {
+          const scoreBar = g.score >= 80 ? '🟢' : g.score >= 60 ? '🟡' : '🔴';
+          scoutMsg += `${i + 1}. ${scoreBar} <b>${g.name}</b>\n`;
+          scoutMsg += `   📌 ${g.funder}\n`;
+          scoutMsg += `   💰 ${g.amount}\n`;
+          scoutMsg += `   📅 Deadline: ${g.deadline}\n`;
+          scoutMsg += `   🎯 ${g.relevance}\n`;
+          scoutMsg += `   🔗 ${g.link}\n`;
+          scoutMsg += `   Match: <b>${g.score}/100</b>\n\n`;
+        });
+
+        scoutMsg += `<i>Auto-runs every Monday 10am PHT · /scout to run manually</i>`;
+        await sendReply(scoutMsg);
+
       } catch (e) {
-        await sendReply(`⚠️ Scout failed: ${e.message}`);
+        await sendReply(`⚠️ Scout error: ${e.message}`);
       }
+
       return res.status(200).end();
     }
   
