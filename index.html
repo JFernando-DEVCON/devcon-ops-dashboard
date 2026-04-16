@@ -185,7 +185,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .budget-total-row td{background:var(--s2);font-weight:600;border-top:2px solid var(--bdr2)}
 
 /* ── Risk tracker ── */
-.risk-row{display:grid;grid-template-columns:3px 1fr 140px 110px 40px;align-items:start;gap:16px;padding:16px 18px;border-bottom:1px solid var(--bdr);transition:background .1s;position:relative}
+.risk-row{display:grid;grid-template-columns:3px 1fr 140px 110px 80px;align-items:start;gap:16px;padding:16px 18px;border-bottom:1px solid var(--bdr);transition:background .1s;position:relative}
 .risk-row:last-child{border-bottom:none}
 .risk-row:hover{background:rgba(255,255,255,.015)}
 .risk-sev{width:3px;border-radius:2px;align-self:stretch;min-height:40px;flex-shrink:0}
@@ -834,15 +834,17 @@ async function loadScoutGrants() {
   try {
     const r = await fetch('/api/get?key=scout_grants');
     const d = await r.json();
-    if (d.data && d.data.grants) {
+    if (d.data && d.data.grants && d.data.grants.length > 0) {
       renderScoutGrants(d.data);
     } else {
+      document.getElementById('scout-stat-total').textContent = '—';
+      document.getElementById('scout-stat-high').textContent  = '—';
       document.getElementById('scout-list').innerHTML =
         '<div class="grant-empty">No grant data yet.<br>Run <code>/scout</code> in Telegram or wait for Monday\'s auto-run.</div>';
     }
   } catch(e) {
     document.getElementById('scout-list').innerHTML =
-      '<div class="grant-empty">Failed to load grant data.</div>';
+      '<div class="grant-empty">Could not connect to server.<br>Check your connection and try again.</div>';
   }
 }
 
@@ -1680,7 +1682,7 @@ function taskRow(t, realIdx, isDone) {
         style="background:transparent;border:1px solid var(--bdr);border-radius:4px;padding:1px 5px;font-family:var(--mono);font-size:9px;color:var(--dim);cursor:pointer;transition:all .15s;line-height:1.4;flex-shrink:0"
         onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc)'"
         onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'"
-      >DATE</button>
+      >EDIT</button>
     </span>
       <div class="task-prio ${prioClass}"
       onclick="moveTask('${prio}',${realIdx})"
