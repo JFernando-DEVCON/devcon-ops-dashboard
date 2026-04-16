@@ -94,7 +94,13 @@ Use ₱ amounts. Be direct and tactical. No padding.`;
     });
 
     const d = await r.json();
-    const text = d.content?.find(b => b.type === 'text')?.text || 'No response.';
+    console.log('Anthropic response status:', r.status);
+    console.log('Anthropic response:', JSON.stringify(d).slice(0, 500));
+    if (!d.content || !d.content.length) {
+      console.error('Empty content from Anthropic:', JSON.stringify(d));
+      return res.status(200).json({ ok: false, error: d.error?.message || 'Empty response from API' });
+    }
+    const text = d.content.find(b => b.type === 'text')?.text || 'No response.';
     return res.status(200).json({ ok: true, text });
 
   } catch (err) {
