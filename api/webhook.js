@@ -2,8 +2,6 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const BOT_TOKEN  = process.env.TELEGRAM_BOT_TOKEN;
 const CLAUDE_KEY = process.env.ANTHROPIC_API_KEY;
-const KV_URL     = process.env.KV_REST_API_URL;
-const KV_TOKEN   = process.env.KV_REST_API_TOKEN;
 
 // ── TEAM CONFIG — mirror of index.html TEAM const ──
 const TEAM = {
@@ -81,7 +79,7 @@ async function logToKV(level, command, user, message) {
       message: message || '—',
     });
     if (logs.length > MAX_LOGS) logs.splice(MAX_LOGS);
-    await kvSet('bot_logs', bot_logs);
+    await kvSet('bot_logs', logs);
   } catch (e) {
     console.warn('⚠ Log write failed:', e.message);
   }
