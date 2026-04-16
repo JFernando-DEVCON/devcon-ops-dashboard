@@ -32,19 +32,19 @@ export default async function handler(req, res) {
     const days = Math.ceil((new Date('2026-06-30') - new Date()) / 864e5);
 
     const criticalTasks = tasks
-      ? (tasks.critical || []).filter(t => !t.done).map(t => `${t.text} (${t.assign})`).join('; ')
+      ? (tasks.critical || []).filter(t => !t.done).slice(0,3).map(t => `${t.text.slice(0,60)} (${t.assign})`).join('; ')
       : 'N/A';
 
     const highTasks = tasks
-      ? (tasks.high || []).filter(t => !t.done).map(t => `${t.text} (${t.assign})`).join('; ')
+      ? (tasks.high || []).filter(t => !t.done).slice(0,3).map(t => `${t.text.slice(0,60)} (${t.assign})`).join('; ')
       : 'N/A';
 
     const backlogTasks = tasks
-      ? (tasks.backlog || []).filter(t => !t.done).map(t => `${t.text} (${t.assign})`).join('; ')
+      ? (tasks.backlog || []).filter(t => !t.done).slice(0,3).map(t => `${t.text.slice(0,40)} (${t.assign})`).join('; ')
       : 'none';
 
     const openRisks = risks
-      ? risks.filter(r => r.status === 'open').map(r => `[${r.sev.toUpperCase()}] ${r.title}`).join('; ')
+      ? risks.filter(r => r.status === 'open').slice(0,4).map(r => `[${r.sev.toUpperCase()}] ${r.title.slice(0,50)}`).join('; ')
       : 'N/A';
 
     const totalSpent = budget
@@ -88,7 +88,7 @@ Use ₱ amounts. Be direct and tactical. No padding.`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
+        max_tokens: 400,
         messages: [{ role: 'user', content: AI_PROMPT }]
       })
     });
