@@ -1,5 +1,5 @@
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
+const BOT_TOKEN   = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID     = process.env.TELEGRAM_CHAT_ID;
 const CRON_SECRET = process.env.CRON_SECRET;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -34,159 +34,166 @@ async function sendTg(text) {
 
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-const FINANCE_KEYWORDS = [
-  'bir','liquidat','reimburs','invoice','budget','vat','payment',
-  'fund','₱','peso','petty','cash','grant','sui'
-];
-
-function isFinance(text) {
-  return FINANCE_KEYWORDS.some(kw => text.toLowerCase().includes(kw));
-}
-
 export default async function handler(req, res) {
   const auth = req.headers.authorization || '';
   if (auth !== `Bearer ${CRON_SECRET}`) return res.status(401).json({ error: 'Unauthorized' });
 
-  const [tasks, risks, chapters, budget] = await Promise.all([
-    kvGet('tasks'), kvGet('risks'), kvGet('chapters'), kvGet('budget')
+  const [tasks, risks, budget, scoutData] = await Promise.all([
+    kvGet('tasks'), kvGet('risks'), kvGet('budget'), kvGet('scout_grants')
   ]);
 
-  if (!tasks || !risks || !chapters || !budget) {
+  if (!tasks || !risks || !budget) {
     return res.status(500).json({ error: 'Failed to load data' });
   }
 
   if (!tasks.backlog) tasks.backlog = [];
 
-  const now      = new Date();
-  const days     = Math.ceil((new Date('2026-06-30') - now) / 864e5);
-  const dateStr  = now.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric', timeZone:'Asia/Manila' });
-  const doneCamps = chapters.filter(c => c.status === 'done').length;
+  const now     = new Date();
+  const days    = Math.ceil((new Date('2026-06-30') - now) / 864e5);
+  const dateStr = now.toLocaleDateString('en-PH', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    timeZone: 'Asia/Manila'
+  });
 
-  const critTasks  = (tasks.critical || []).filter(t => !t.done);
-  const highTasks  = (tasks.high || []).filter(t => !t.done);
-  const medTasks   = (tasks.medium || []).filter(t => !t.done);
-  const backlog    = (tasks.backlog || []).filter(t => !t.done);
-  const openRisks  = risks.filter(r => r.status === 'open');
-  const critRisks  = openRisks.filter(r => r.sev === 'critical');
-  const highRisks  = openRisks.filter(r => r.sev === 'high');
+  const critTasks = (tasks.critical || []).filter(t => !t.done);
+  const highTasks = (tasks.high     || []).filter(t => !t.done);
+  const medTasks  = (tasks.medium   || []).filter(t => !t.done);
+  const backlog   = (tasks.backlog  || []).filter(t => !t.done);
+  const openRisks = risks.filter(r => r.status === 'open');
+  const critRisks = openRisks.filter(r => r.sev === 'critical');
+  const highRisks = openRisks.filter(r => r.sev === 'high');
+  const medRisks  = openRisks.filter(r => r.sev === 'medium');
 
   const totalSpent = budget.filter(l => !l.vat).reduce((s, l) => s + l.spent, 0);
   const remaining  = 1000000 - totalSpent;
+  const pctUsed    = Math.round(totalSpent / 1000000 * 100);
 
-  // Non-finance tasks only
-  const critNonFin = critTasks.filter(t => !isFinance(t.text));
-  const highNonFin = highTasks.filter(t => !isFinance(t.text));
-  const medNonFin  = medTasks.filter(t => !isFinance(t.text));
-  const backNonFin = backlog.filter(t => !isFinance(t.text));
+  // ── MESSAGE 1: HQ Programs and Ops Tasks Summary ──
+  const totalOpen = critTasks.length + highTasks.length + medTasks.length + backlog.length;
 
-  // Finance tasks only
-  const critFin = critTasks.filter(t => isFinance(t.text));
-  const highFin = highTasks.filter(t => isFinance(t.text));
-  const backFin = backlog.filter(t => isFinance(t.text));
+  let msg1 = `📋 <b>DEVCON OPS DSU — ${dateStr}</b>\n\n`;
+  msg1 += `<b>6.1 HQ PROGRAMS &amp; OPS TASKS</b>\n`;
+  msg1 += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  // ── MESSAGE 1: Program Ops DSU ──
-  let msg1 = `📝 <b>DEVCON OPS — DAILY DSU</b>\n${dateStr}\n\n`;
-  msg1 += `📊 <b>KPI</b>\n`;
-  msg1 += `🏕 Camps: <b>${doneCamps}/5</b> · 📅 <b>${days} days</b> to Q2 · 💰 Grant ✅ PAID\n\n`;
+  msg1 += `📊 ${days} days to Q2 deadline (Jun 30)\n\n`;
 
-  const upcomingCamps = chapters.filter(c => c.status !== 'done');
-  if (upcomingCamps.length) {
-    msg1 += `📅 <b>UPCOMING CAMPS</b>\n`;
-    upcomingCamps.forEach(c => msg1 += `• ${c.name} — ${c.date} (${c.status.toUpperCase()})\n`);
+  if (critTasks.length) {
+    msg1 += `🔴 <b>CRITICAL (${critTasks.length})</b>\n`;
+    critTasks.forEach(t => msg1 += `• ${t.text} <i>(${t.assign}${t.due ? ' · ' + t.due : ''})</i>\n`);
     msg1 += '\n';
   }
 
-  if (critRisks.length) {
-    msg1 += `🚨 <b>CRITICAL RISKS</b>\n`;
-    critRisks.forEach(r => msg1 += `🔴 ${r.title}\n   → ${r.action}\n`);
+  if (highTasks.length) {
+    msg1 += `🟠 <b>HIGH PRIORITY (${highTasks.length})</b>\n`;
+    highTasks.forEach(t => msg1 += `• ${t.text} <i>(${t.assign}${t.due ? ' · ' + t.due : ''})</i>\n`);
     msg1 += '\n';
+  }
+
+  if (medTasks.length) {
+    msg1 += `🟡 <b>THIS WEEK (${medTasks.length})</b>\n`;
+    medTasks.forEach(t => msg1 += `• ${t.text} <i>(${t.assign}${t.due ? ' · ' + t.due : ''})</i>\n`);
+    msg1 += '\n';
+  }
+
+  if (backlog.length) {
+    msg1 += `📦 <b>BACKLOGS — OVERDUE (${backlog.length})</b>\n`;
+    backlog.forEach(t => msg1 += `• ${t.text} <i>(${t.assign})</i>\n`);
+    msg1 += '\n';
+  }
+
+  if (!totalOpen) msg1 += `✅ No open tasks. All clear.\n\n`;
+
+  msg1 += `⚠️ <b>RISKS TO MANAGE</b>\n`;
+  if (critRisks.length) {
+    critRisks.forEach(r => msg1 += `🔴 ${r.title}\n   → ${r.action}\n`);
   }
   if (highRisks.length) {
-    msg1 += `⚠️ <b>HIGH RISKS</b>\n`;
-    highRisks.slice(0,3).forEach(r => msg1 += `🟠 ${r.title}\n   → ${r.action}\n`);
-    msg1 += '\n';
+    highRisks.forEach(r => msg1 += `🟠 ${r.title}\n   → ${r.action}\n`);
   }
+  if (medRisks.length) {
+    medRisks.slice(0,3).forEach(r => msg1 += `🟡 ${r.title}\n   → ${r.action}\n`);
+  }
+  if (!openRisks.length) msg1 += `✅ No open risks.\n`;
 
-  const totalNonFin = critNonFin.length + highNonFin.length + medNonFin.length + backNonFin.length;
-  msg1 += `✅ <b>OPEN TASKS (${totalNonFin})</b>\n`;
-  if (critNonFin.length) {
-    msg1 += `🔴 Critical:\n`;
-    critNonFin.forEach(t => msg1 += `• ${t.text} <i>(${t.assign})</i>\n`);
-  }
-  if (highNonFin.length) {
-    msg1 += `🟠 High:\n`;
-    highNonFin.slice(0,4).forEach(t => msg1 += `• ${t.text} <i>(${t.assign})</i>\n`);
-  }
-  if (medNonFin.length) {
-    msg1 += `🟡 This Week:\n`;
-    medNonFin.slice(0,3).forEach(t => msg1 += `• ${t.text} <i>(${t.assign})</i>\n`);
-  }
-  if (backNonFin.length) {
-    msg1 += `📦 Backlog (overdue):\n`;
-    backNonFin.slice(0,3).forEach(t => msg1 += `• ${t.text} <i>(${t.assign})</i>\n`);
-  }
-  msg1 += `\n<i>DEVCON × Sui MOU · Build Beyond</i>`;
+  // ── MESSAGE 2: Budget, CA Tracking & Liquidation ──
+  const caLines   = budget.filter(l => !l.vat && l.spent > 0);
+  const overLines = budget.filter(l => !l.vat && l.spent > l.alloc);
 
-  // ── MESSAGE 2: Per Team Tasks ──
-  const TEAM_HQ       = ['Dom', 'Michael Lance', 'Jedd', 'Marica', 'RJ'];
-  const TEAM_CHAPTERS = ['Precious','Rolf','Ted','Zhi','Danmel','Rejy Joash','JP Remar Serrano','Sab','Sabrinah','Christian Jake Geonzon','Reyche'];
-  const TEAM_INTERNS  = ['Lady','Kien','Kenshin','Allyza','Clayton','Dale','Zendy'];
-  const allPeople     = [...TEAM_HQ, ...TEAM_CHAPTERS, ...TEAM_INTERNS];
-  const allOpen       = [...critTasks, ...highTasks, ...medTasks, ...backlog];
+  let msg2 = `💰 <b>6.2 BUDGET, CA &amp; LIQUIDATION</b>\n`;
+  msg2 += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  let msg2 = `👥 <b>DEVCON OPS — TASKS BY PERSON</b>\n${dateStr}\n\n`;
+  msg2 += `<b>Budget Summary</b>\n`;
+  msg2 += `Grant: ✅ ₱1,120,000 PAID\n`;
+  msg2 += `Spent: ₱${totalSpent.toLocaleString()} / ₱1,000,000 (${pctUsed}% used)\n`;
+  msg2 += `Remaining: <b>₱${remaining.toLocaleString()}</b>\n`;
+  if (overLines.length) {
+    msg2 += `⚠️ Lines over budget: ${overLines.map(l => `Line ${l.num}`).join(', ')}\n`;
+  }
+  msg2 += '\n';
 
-  allPeople.forEach(person => {
-    const myTasks = allOpen.filter(t =>
-      (t.assign || '').toLowerCase().includes(person.toLowerCase().split(' ')[0])
-    );
-    if (myTasks.length) {
-      msg2 += `👤 <b>${person}</b> (${myTasks.length})\n`;
-      myTasks.forEach(t => {
-        const prio = t.backlogFrom ? '📦' : tasks.critical.find(x => x.id === t.id) ? '🔴' : tasks.high.find(x => x.id === t.id) ? '🟠' : '🟡';
-        msg2 += `  ${prio} ${t.text}\n`;
-      });
-      msg2 += '\n';
-    }
+  msg2 += `<b>Cash Advance Summary</b>\n`;
+  caLines.forEach(l => {
+    const pct = Math.round(l.spent / l.alloc * 100);
+    const bar = pct >= 100 ? '🔴' : pct >= 80 ? '🟠' : '🟢';
+    msg2 += `${bar} Line ${l.num} — ${l.name}\n`;
+    msg2 += `   ₱${l.spent.toLocaleString()} / ₱${l.alloc.toLocaleString()} (${pct}%)\n`;
   });
+  msg2 += '\n';
 
-  // ── MESSAGE 3: Finance Internal ──
-  const totalFinTasks = critFin.length + highFin.length + backFin.length;
-  const finRisks = openRisks.filter(r =>
-    FINANCE_KEYWORDS.some(kw => r.title.toLowerCase().includes(kw) || r.action.toLowerCase().includes(kw))
+  msg2 += `<b>Liquidation To-Do</b>\n`;
+  const finKeywords = ['bir','liquidat','reimburs','invoice','vat','receipt'];
+  const finTasks = [...critTasks, ...highTasks, ...backlog].filter(t =>
+    finKeywords.some(kw => t.text.toLowerCase().includes(kw))
   );
+  if (finTasks.length) {
+    finTasks.forEach(t => msg2 += `• ${t.text} <i>(${t.assign})</i>\n`);
+  } else {
+    msg2 += `✅ No pending liquidation tasks.\n`;
+  }
 
-  let msg3 = `💰 <b>DEVCON OPS — FINANCE INTERNAL</b>\n${dateStr}\n\n`;
-  msg3 += `<b>Grant Status:</b> ✅ ₱1,120,000 PAID\n`;
-  msg3 += `<b>Subtotal Spent:</b> ₱${totalSpent.toLocaleString()} / ₱1,000,000\n`;
-  msg3 += `<b>Remaining:</b> ₱${remaining.toLocaleString()}\n\n`;
+  // ── MESSAGE 3: Fundraising Scout Bot Summary ──
+  const grants      = scoutData?.grants || [];
+  const highGrants  = grants.filter(g => g.score >= 80);
+  const googleGrant = grants.find(g =>
+    g.name.toLowerCase().includes('google') ||
+    g.funder.toLowerCase().includes('google')
+  );
+  const genAt = scoutData?.generated_at
+    ? new Date(scoutData.generated_at).toLocaleDateString('en-PH', {
+        month: 'short', day: 'numeric', timeZone: 'Asia/Manila'
+      })
+    : 'Not yet run';
 
-  if (totalFinTasks > 0) {
-    msg3 += `📋 <b>FINANCE TASKS (${totalFinTasks})</b>\n`;
-    if (critFin.length) {
-      msg3 += `🔴 Critical:\n`;
-      critFin.forEach(t => msg3 += `• <code>${t.id}</code> ${t.text} <i>(${t.assign})</i>\n`);
-    }
-    if (highFin.length) {
-      msg3 += `🟠 High:\n`;
-      highFin.forEach(t => msg3 += `• <code>${t.id}</code> ${t.text} <i>(${t.assign})</i>\n`);
-    }
-    if (backFin.length) {
-      msg3 += `📦 Backlog (overdue):\n`;
-      backFin.forEach(t => msg3 += `• <code>${t.id}</code> ${t.text} <i>(${t.assign})</i>\n`);
-    }
+  let msg3 = `🔍 <b>6.3 FUNDRAISING SCOUT</b>\n`;
+  msg3 += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  msg3 += `Last Scout: ${genAt} · ${grants.length} grants found · ${highGrants.length} high match (80+)\n\n`;
+
+  if (highGrants.length) {
+    msg3 += `<b>Top Matches</b>\n`;
+    highGrants.slice(0,4).forEach(g => {
+      const bar = g.score >= 90 ? '🟢' : '🟡';
+      msg3 += `${bar} <b>${g.name}</b> — ${g.funder}\n`;
+      msg3 += `   ${g.amount} · Due: ${g.deadline}\n`;
+    });
     msg3 += '\n';
   }
 
-  if (finRisks.length) {
-    msg3 += `⚠️ <b>FINANCE RISKS</b>\n`;
-    finRisks.forEach(r => {
-      const icon = r.sev === 'critical' ? '🔴' : r.sev === 'high' ? '🟠' : '🟡';
-      msg3 += `${icon} ${r.title}\n   → ${r.action}\n`;
-    });
+  msg3 += `<b>Priority To-Do</b>\n`;
+  if (googleGrant) {
+    msg3 += `🎯 <b>Google AI Grant — HIGH POTENTIAL</b>\n`;
+    msg3 += `   ${googleGrant.name} · ${googleGrant.funder}\n`;
+    msg3 += `   ${googleGrant.amount} · Due: ${googleGrant.deadline}\n`;
+    msg3 += `   → Prepare application. Strongest fit for DEVCON AI education programs.\n\n`;
+  } else {
+    msg3 += `🎯 Google AI Grant — Search and identify open cycle. High potential for DEVCON AI education programs.\n\n`;
   }
 
-  msg3 += `\n<i>Finance Internal · DEVCON HQ</i>`;
+  msg3 += `📌 <b>Q4 2026 Pipeline</b>\n`;
+  msg3 += `• Stellar Development Foundation — Flag as target if Sui MOU does not renew post-Jun 2026.\n`;
+  msg3 += `  Similar web3 + education focus. Start relationship building Q3.\n\n`;
+
+  msg3 += `<i>Scout auto-runs every Monday 10am PHT · /scout to run manually</i>`;
 
   // Send all 3 messages
   await sendTg(msg1);
