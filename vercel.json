@@ -24,8 +24,14 @@
     { "src": "/api/migrate",   "dest": "/api/migrate.js" },
     { "src": "/",              "dest": "/index.html" }
   ],
-  "crons": [
-    { "path": "/api/cron",  "schedule": "0 2 * * 1-5" },
-    { "path": "/api/scout", "schedule": "0 2 * * 1" }
+"crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "0 2 * * 1-5"
+    },
+    {
+      "path": "/api/scout",
+      "schedule": "0 2 * * 1"
+    }
   ]
 }
